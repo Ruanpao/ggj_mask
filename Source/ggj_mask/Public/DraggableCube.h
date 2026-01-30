@@ -35,5 +35,6 @@ public:
 	UPROPERTY(BlueprintReadOnly,Category = "Dragging")
 	bool bIsBeingDragged = false;
 private:
-	FVector DragOffset;
+	FVector DragStartPosition;
+	float DragStartHeight;
 };

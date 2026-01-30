@@ -134,14 +134,25 @@ void Aggj_maskCharacter::Tick(float DeltaTime)
 	{
 		if(APlayerController*PC = Cast<APlayerController>(GetController()))
 		{
-			FVector WorldLocation, WorldDirection;
-			if(PC->DeprojectMousePositionToWorld(WorldLocation,WorldDirection))
+			// 获取鼠标在屏幕上的位置
+			float MouseX, MouseY;
+			if(PC->GetMousePosition(MouseX, MouseY))
 			{
-				float DistanceToGround = -WorldLocation.Z / WorldDirection.Z;
-				if(DistanceToGround > 0)
+				// 将屏幕位置转换为世界位置（在方块高度平面上）
+				FVector WorldLocation, WorldDirection;
+				if(PC->DeprojectScreenPositionToWorld(MouseX, MouseY, WorldLocation, WorldDirection))
 				{
-					FVector GroundPosition = WorldLocation + WorldDirection * DistanceToGround;
-					CurrentDraggableCube->UpdateDragging(GroundPosition);
+					// 使用方块当前高度
+					float CubeHeight = CurrentDraggableCube->GetActorLocation().Z;
+					
+					// 计算射线与方块高度平面的交点
+					if (FMath::Abs(WorldDirection.Z) > 0.0001f)
+					{
+						float Distance = (CubeHeight - WorldLocation.Z) / WorldDirection.Z;
+						FVector TargetPosition = WorldLocation + WorldDirection * Distance;
+						
+						CurrentDraggableCube->UpdateDragging(TargetPosition);
+					}
 				}
 			}
 		}
@@ -331,11 +342,38 @@ void Aggj_maskCharacter::StartDragging(const FInputActionValue& Value)
 		return;
 	}
 
-	ADraggableCube* DraggableCube = FinDraggableCube();
-	if(DraggableCube)
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if(!PC)
 	{
-		CurrentDraggableCube = DraggableCube;
-		CurrentDraggableCube->StartDragging(this);
+		UE_LOG(LogTemplateCharacter, Error, TEXT("无法获取PlayerController"));
+		return;
+	}
+
+	FVector WorldLocation, WorldDirection;
+	if (PC->DeprojectMousePositionToWorld(WorldLocation, WorldDirection))
+	{
+		// 从摄像机位置发射射线
+		FVector Start = FollowCamera->GetComponentLocation();
+		FVector End = Start + WorldDirection * 10000.0f;
+		
+		FHitResult HitResult;
+		FCollisionQueryParams Params;
+		Params.AddIgnoredActor(this);
+		
+		if (GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECC_Visibility, Params))
+		{
+			ADraggableCube* HitCube = Cast<ADraggableCube>(HitResult.GetActor());
+			if (HitCube && !HitCube->bIsBeingDragged)
+			{
+				CurrentDraggableCube = HitCube;
+				CurrentDraggableCube->StartDragging(this);
+				
+				UE_LOG(LogTemplateCharacter, Warning, TEXT("成功开始拖拽方块: %s"), *HitCube->GetName());
+				
+			}
+			
+		}
+		
 	}
 	
 }

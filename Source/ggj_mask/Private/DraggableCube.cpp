@@ -40,9 +40,10 @@ void ADraggableCube::StartDragging(AActor* Dragger)
 
 	bIsBeingDragged = true;
 	DraggingActor = Dragger;
-
-	DragOffset = GetActorLocation() - Dragger->GetActorLocation();
-
+	
+	DragStartPosition = GetActorLocation();
+	DragStartHeight = GetActorLocation().Z;
+	
 	CubeMesh->SetRenderCustomDepth(true);
 	CubeMesh->SetCustomDepthStencilValue(1);
 }
@@ -67,9 +68,11 @@ void ADraggableCube::UpdateDragging(const FVector& TargetPosition)
 		return;
 	}
 
-	FVector NewLocation = TargetPosition;
-
-	NewLocation.Z = FMath::Min(NewLocation.Z, 50.0f);
+	FVector NewLocation = FVector(
+		TargetPosition.X,        
+		TargetPosition.Y,        
+		DragStartHeight         
+	);
 
 	SetActorLocation(NewLocation);
 }
