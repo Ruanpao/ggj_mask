@@ -26,4 +26,6 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	virtual void OnInteract_Implementation(AActor* Interactor) override;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	class UStaticMeshComponent* MeshComponent;
 };

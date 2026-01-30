@@ -55,9 +55,13 @@ class Aggj_maskCharacter : public ACharacter
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* ApplySkillAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* PickUpAction;
 public:
 	Aggj_maskCharacter();
-	
+
+	bool IsWearOpenDoorMask() const { return bWearOpenDoorMask; }
 
 protected:
 
@@ -74,6 +78,8 @@ protected:
 	void WearOpenDoorMask(const FInputActionValue& Value);
 
 	void ApplySkill(const FInputActionValue& Value);
+
+	void PickUp(const FInputActionValue& Value);
 protected:
 	// APawn interface
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -91,5 +97,10 @@ private:
 	bool bWearBasicMask = true;
 	bool bWearSmallMask = false;
 	bool bWearOpenDoorMask = false;
+
+	bool bGetSmallMask = false;
+	bool bGetOpenDoorMask = false;
+
+	bool bSmall = false;
 };
 

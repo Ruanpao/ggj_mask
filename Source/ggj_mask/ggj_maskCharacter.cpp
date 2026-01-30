@@ -10,6 +10,10 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "InteractInterface.h"
+#include "ggj_mask/Public/Masks/BasicMask.h"
+#include "ggj_mask/Public/Masks/BeSmallMask.h"
+#include "ggj_mask/Public/Masks/OpenDoorMask.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -101,6 +105,8 @@ void Aggj_maskCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 		EnhancedInputComponent->BindAction(WearMask3, ETriggerEvent::Started, this, &Aggj_maskCharacter::WearOpenDoorMask);
 
 		EnhancedInputComponent->BindAction(ApplySkillAction, ETriggerEvent::Started, this, &Aggj_maskCharacter::ApplySkill);
+
+		EnhancedInputComponent->BindAction(PickUpAction, ETriggerEvent::Started, this, &Aggj_maskCharacter::PickUp);
 		// Looking
 		// EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &Aggj_maskCharacter::Look);
 	}
@@ -156,6 +162,10 @@ void Aggj_maskCharacter::WearBasicMask(const FInputActionValue& Value)
 
 void Aggj_maskCharacter::WearSmallMask(const FInputActionValue& Value)
 {
+	if(!bGetSmallMask)
+	{
+		return;
+	}
 	UE_LOG(LogTemplateCharacter, Error, TEXT("Wear Small Mask"));
 	bWearBasicMask = false;
 	bWearSmallMask = true;
@@ -164,6 +174,10 @@ void Aggj_maskCharacter::WearSmallMask(const FInputActionValue& Value)
 
 void Aggj_maskCharacter::WearOpenDoorMask(const FInputActionValue& Value)
 {
+	if(!bGetOpenDoorMask)
+	{
+		return;
+	}
 	UE_LOG(LogTemplateCharacter, Error, TEXT("Wear OpenDoor Mask"));
 	bWearBasicMask = false;
 	bWearSmallMask = false;
@@ -180,10 +194,78 @@ void Aggj_maskCharacter::ApplySkill(const FInputActionValue& Value)
 	else if (bWearSmallMask)
 	{
 		UE_LOG(LogTemplateCharacter, Error, TEXT("Apply Small Mask Skill"));
-		SetActorScale3D(FVector(0.1f, 0.1f, 0.1f));
+		
+		if(!bSmall)
+		{
+			SetActorScale3D(FVector(0.1f, 0.1f, 0.1f));
+			bSmall = true;
+		}
+		else
+		{
+			SetActorScale3D(FVector(1.f, 1.f, 1.f));
+			bSmall = false;
+		}
 	}
 	else if (bWearOpenDoorMask)
 	{
 		UE_LOG(LogTemplateCharacter, Error, TEXT("Apply OpenDoor Mask Skill"));
+	}
+}
+
+void Aggj_maskCharacter::PickUp(const FInputActionValue& Value)
+{
+	AActor* InteractableActor = nullptr;
+	if(!Controller)
+	{
+		return;
+	}
+	
+	FVector SphereCenter = GetActorLocation()  + (GetActorForwardVector() * 100.f);
+	float SphereRadius = 100.0f;
+
+	
+	DrawDebugSphere(GetWorld(), SphereCenter, SphereRadius, 16, FColor::Green, false, 2.f);
+	
+	FHitResult HitResult;
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(this);
+
+	
+	if(GetWorld()->SweepSingleByChannel(HitResult, SphereCenter, SphereCenter, FQuat::Identity, 
+		ECC_Visibility, FCollisionShape::MakeSphere(SphereRadius), Params))
+	{
+		AActor* HitActor = HitResult.GetActor();
+
+		if(HitActor && HitActor->GetClass()->ImplementsInterface(UInteractInterface::StaticClass()))
+		{
+			InteractableActor = HitActor;
+			
+			DrawDebugPoint(GetWorld(), HitResult.Location, 10.0f, FColor::Red, false, 2.f);
+		}
+	}
+
+	if(InteractableActor)
+	{
+		if(InteractableActor->GetClass()->ImplementsInterface(UInteractInterface::StaticClass()))
+		{
+			IInteractInterface::Execute_OnInteract(InteractableActor, this);
+			
+			if (ABeSmallMask* SmallMask = Cast<ABeSmallMask>(InteractableActor))
+			{
+				// 拾取到变小面具
+				bGetSmallMask = true;
+				UE_LOG(LogTemplateCharacter, Warning, TEXT("获得变小面具"));
+			}
+			else if (AOpenDoorMask* OpenDoorMask = Cast<AOpenDoorMask>(InteractableActor))
+			{
+				// 拾取到开门面具
+				bGetOpenDoorMask = true;
+				UE_LOG(LogTemplateCharacter, Warning, TEXT("获得开门面具"));
+			}
+			else
+			{
+				UE_LOG(LogTemplateCharacter, Warning, TEXT("未拾取到"));
+			}
+		}
 	}
 }
