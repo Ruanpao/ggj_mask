@@ -21,6 +21,7 @@ class GGJ_MASK_API AEnemy : public APawn
 public:
 	// Sets default values for this pawn's properties
 	AEnemy();
+	
 
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -49,7 +50,15 @@ public:
 	UFUNCTION()
 	void OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
 
-public:    
+	UPROPERTY(EditAnywhere, Category = "Mask")
+	bool CanBeSmall;
+	UPROPERTY(EditAnywhere, Category = "Mask")
+	bool CanOpenDoor;
+	// UPROPERTY(EditAnywhere, Category = "Mask")
+	// bool CanDisableTraps;
+	//
+
+	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
