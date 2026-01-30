@@ -3,6 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "DraggableCube.h"
+#include "InputActionValue.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
 #include "ggj_maskCharacter.generated.h"
@@ -54,15 +56,21 @@ class Aggj_maskCharacter : public ACharacter
 	UInputAction* WearMask3;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* WearMask4;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* ApplySkillAction;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* PickUpAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* DragAction;
 public:
 	Aggj_maskCharacter();
 
 	bool IsWearOpenDoorMask() const { return bWearOpenDoorMask; }
-
+	virtual void Tick(float DeltaTime) override;
 protected:
 
 	/** Called for movement input */
@@ -77,9 +85,16 @@ protected:
 
 	void WearOpenDoorMask(const FInputActionValue& Value);
 
+	void WearDragMask(const FInputActionValue& Value);
+
 	void ApplySkill(const FInputActionValue& Value);
 
 	void PickUp(const FInputActionValue& Value);
+
+	void StartDragging(const FInputActionValue& Value);
+	void StopDragging(const FInputActionValue& Value);
+
+	ADraggableCube* FinDraggableCube();
 protected:
 	// APawn interface
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -97,10 +112,14 @@ private:
 	bool bWearBasicMask = true;
 	bool bWearSmallMask = false;
 	bool bWearOpenDoorMask = false;
+	bool bWearDragMask = false;
 
 	bool bGetSmallMask = false;
 	bool bGetOpenDoorMask = false;
+	bool bGetDragMask = false;
 
 	bool bSmall = false;
+
+	ADraggableCube* CurrentDraggableCube;
 };
 
