@@ -42,14 +42,22 @@ Aggj_maskCharacter::Aggj_maskCharacter()
 	// Create a camera boom (pulls in towards the player if there is a collision)
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->TargetArmLength = 400.0f; // The camera follows at this distance behind the character	
-	CameraBoom->bUsePawnControlRotation = true; // Rotate the arm based on the controller
+	CameraBoom->bUsePawnControlRotation = false;
+	CameraBoom->SetRelativeRotation(FRotator(-60.f, 0.f, 0.f));
+	CameraBoom->TargetArmLength = 1000.0f; 
+	//CameraBoom->SetUsingAbsoluteRotation(true); 
+	CameraBoom->bDoCollisionTest = false;
+	CameraBoom->bUsePawnControlRotation = false;
+	CameraBoom->bInheritPitch = false;
+	CameraBoom->bInheritYaw = false;
+	CameraBoom->bInheritRoll = false;
 
 	// Create a follow camera
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 
+	
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 }
@@ -58,6 +66,8 @@ void Aggj_maskCharacter::BeginPlay()
 {
 	// Call the base class  
 	Super::BeginPlay();
+
+	
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -77,15 +87,22 @@ void Aggj_maskCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 	// Set up action bindings
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
 		
-		// Jumping
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
+		// // Jumping
+		// EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
+		// EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 
 		// Moving
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &Aggj_maskCharacter::Move);
 
+		EnhancedInputComponent->BindAction(WearMask1, ETriggerEvent::Started, this, &Aggj_maskCharacter::WearBasicMask);
+
+		EnhancedInputComponent->BindAction(WearMask2, ETriggerEvent::Started, this, &Aggj_maskCharacter::WearSmallMask);
+
+		EnhancedInputComponent->BindAction(WearMask3, ETriggerEvent::Started, this, &Aggj_maskCharacter::WearOpenDoorMask);
+
+		EnhancedInputComponent->BindAction(ApplySkillAction, ETriggerEvent::Started, this, &Aggj_maskCharacter::ApplySkill);
 		// Looking
-		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &Aggj_maskCharacter::Look);
+		// EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &Aggj_maskCharacter::Look);
 	}
 	else
 	{
@@ -127,4 +144,33 @@ void Aggj_maskCharacter::Look(const FInputActionValue& Value)
 		AddControllerYawInput(LookAxisVector.X);
 		AddControllerPitchInput(LookAxisVector.Y);
 	}
+}
+
+void Aggj_maskCharacter::WearBasicMask(const FInputActionValue& Value)
+{
+	UE_LOG(LogTemplateCharacter, Error, TEXT("Wear Basic Mask"));
+	bWearBasicMask = true;
+	bWearSmallMask = false;
+	bWearOpenDoorMask = false;
+}
+
+void Aggj_maskCharacter::WearSmallMask(const FInputActionValue& Value)
+{
+	UE_LOG(LogTemplateCharacter, Error, TEXT("Wear Small Mask"));
+	bWearBasicMask = false;
+	bWearSmallMask = true;
+	bWearOpenDoorMask = false;
+}
+
+void Aggj_maskCharacter::WearOpenDoorMask(const FInputActionValue& Value)
+{
+	UE_LOG(LogTemplateCharacter, Error, TEXT("Wear OpenDoor Mask"));
+	bWearBasicMask = false;
+	bWearSmallMask = false;
+	bWearOpenDoorMask = true;
+}
+
+void Aggj_maskCharacter::ApplySkill(const FInputActionValue& Value)
+{
+	UE_LOG(LogTemplateCharacter, Error, TEXT("Apply Skill"));
 }
