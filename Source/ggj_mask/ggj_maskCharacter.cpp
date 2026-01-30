@@ -14,6 +14,8 @@
 #include "ggj_mask/Public/Masks/BasicMask.h"
 #include "ggj_mask/Public/Masks/BeSmallMask.h"
 #include "ggj_mask/Public/Masks/OpenDoorMask.h"
+#include "Kismet/GameplayStatics.h"
+#include "Masks/DragMask.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -71,7 +73,10 @@ void Aggj_maskCharacter::BeginPlay()
 	// Call the base class  
 	Super::BeginPlay();
 
-	
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		PC->bShowMouseCursor = true;
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -104,15 +109,42 @@ void Aggj_maskCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 
 		EnhancedInputComponent->BindAction(WearMask3, ETriggerEvent::Started, this, &Aggj_maskCharacter::WearOpenDoorMask);
 
+		EnhancedInputComponent->BindAction(WearMask4, ETriggerEvent::Started, this, &Aggj_maskCharacter::WearDragMask);
+		
 		EnhancedInputComponent->BindAction(ApplySkillAction, ETriggerEvent::Started, this, &Aggj_maskCharacter::ApplySkill);
 
 		EnhancedInputComponent->BindAction(PickUpAction, ETriggerEvent::Started, this, &Aggj_maskCharacter::PickUp);
+
+		EnhancedInputComponent->BindAction(DragAction, ETriggerEvent::Started, this, &Aggj_maskCharacter::StartDragging);
+		EnhancedInputComponent->BindAction(DragAction, ETriggerEvent::Completed, this, &Aggj_maskCharacter::StopDragging);
 		// Looking
 		// EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &Aggj_maskCharacter::Look);
 	}
 	else
 	{
 		UE_LOG(LogTemplateCharacter, Error, TEXT("'%s' Failed to find an Enhanced Input component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
+	}
+}
+
+void Aggj_maskCharacter::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	if(CurrentDraggableCube && bWearDragMask)
+	{
+		if(APlayerController*PC = Cast<APlayerController>(GetController()))
+		{
+			FVector WorldLocation, WorldDirection;
+			if(PC->DeprojectMousePositionToWorld(WorldLocation,WorldDirection))
+			{
+				float DistanceToGround = -WorldLocation.Z / WorldDirection.Z;
+				if(DistanceToGround > 0)
+				{
+					FVector GroundPosition = WorldLocation + WorldDirection * DistanceToGround;
+					CurrentDraggableCube->UpdateDragging(GroundPosition);
+				}
+			}
+		}
 	}
 }
 
@@ -158,6 +190,7 @@ void Aggj_maskCharacter::WearBasicMask(const FInputActionValue& Value)
 	bWearBasicMask = true;
 	bWearSmallMask = false;
 	bWearOpenDoorMask = false;
+	bWearDragMask = false;
 }
 
 void Aggj_maskCharacter::WearSmallMask(const FInputActionValue& Value)
@@ -170,6 +203,7 @@ void Aggj_maskCharacter::WearSmallMask(const FInputActionValue& Value)
 	bWearBasicMask = false;
 	bWearSmallMask = true;
 	bWearOpenDoorMask = false;
+	bWearDragMask = false;
 }
 
 void Aggj_maskCharacter::WearOpenDoorMask(const FInputActionValue& Value)
@@ -182,6 +216,20 @@ void Aggj_maskCharacter::WearOpenDoorMask(const FInputActionValue& Value)
 	bWearBasicMask = false;
 	bWearSmallMask = false;
 	bWearOpenDoorMask = true;
+	bWearDragMask = false;
+}
+
+void Aggj_maskCharacter::WearDragMask(const FInputActionValue& Value)
+{
+	if(!bGetDragMask)
+	{
+		return;
+	}
+	UE_LOG(LogTemplateCharacter, Error, TEXT("Wear Drag Mask"));
+	bWearBasicMask = false;
+	bWearSmallMask = false;
+	bWearOpenDoorMask = false;
+	bWearDragMask = true;
 }
 
 void Aggj_maskCharacter::ApplySkill(const FInputActionValue& Value)
@@ -262,10 +310,71 @@ void Aggj_maskCharacter::PickUp(const FInputActionValue& Value)
 				bGetOpenDoorMask = true;
 				UE_LOG(LogTemplateCharacter, Warning, TEXT("获得开门面具"));
 			}
+			else if(ADragMask* DragMask = Cast<ADragMask>(InteractableActor))
+			{
+				// 拾取到拖拽面具
+				bGetDragMask = true;
+				UE_LOG(LogTemplateCharacter, Warning, TEXT("获得拖拽面具"));
+			}
 			else
 			{
 				UE_LOG(LogTemplateCharacter, Warning, TEXT("未拾取到"));
 			}
 		}
 	}
+}
+
+void Aggj_maskCharacter::StartDragging(const FInputActionValue& Value)
+{
+	if(!bWearDragMask)
+	{
+		return;
+	}
+
+	ADraggableCube* DraggableCube = FinDraggableCube();
+	if(DraggableCube)
+	{
+		CurrentDraggableCube = DraggableCube;
+		CurrentDraggableCube->StartDragging(this);
+	}
+	
+}
+
+void Aggj_maskCharacter::StopDragging(const FInputActionValue& Value)
+{
+	if(CurrentDraggableCube)
+	{
+		CurrentDraggableCube->StopDragging();
+		CurrentDraggableCube = nullptr;
+	}
+}
+
+ADraggableCube* Aggj_maskCharacter::FinDraggableCube()
+{
+	if(!Controller)
+	{
+		return nullptr;
+	}
+
+	TArray<AActor*> AllCubes;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ADraggableCube::StaticClass(), AllCubes);
+
+	ADraggableCube* ClosestCube = nullptr;
+	float MinDistance = MAX_FLT;
+
+	for(AActor* Actor : AllCubes)
+	{
+		if (ADraggableCube* Cube = Cast<ADraggableCube>(Actor))
+		{
+			if (Cube->bIsBeingDragged) continue;
+			
+			float Distance = FVector::Dist(GetActorLocation(), Cube->GetActorLocation());
+			if (Distance < MinDistance)
+			{
+				MinDistance = Distance;
+				ClosestCube = Cube;
+			}
+		}
+	}
+	return ClosestCube;
 }
