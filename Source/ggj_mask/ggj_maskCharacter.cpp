@@ -172,5 +172,18 @@ void Aggj_maskCharacter::WearOpenDoorMask(const FInputActionValue& Value)
 
 void Aggj_maskCharacter::ApplySkill(const FInputActionValue& Value)
 {
-	UE_LOG(LogTemplateCharacter, Error, TEXT("Apply Skill"));
+	
+	if (bWearBasicMask)
+	{
+		UE_LOG(LogTemplateCharacter, Error, TEXT("Apply Basic Mask Skill"));
+	}
+	else if (bWearSmallMask)
+	{
+		UE_LOG(LogTemplateCharacter, Error, TEXT("Apply Small Mask Skill"));
+		SetActorScale3D(FVector(0.1f, 0.1f, 0.1f));
+	}
+	else if (bWearOpenDoorMask)
+	{
+		UE_LOG(LogTemplateCharacter, Error, TEXT("Apply OpenDoor Mask Skill"));
+	}
 }
