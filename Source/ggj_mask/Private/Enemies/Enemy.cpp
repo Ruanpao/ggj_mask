@@ -517,7 +517,7 @@ bool AEnemy::MoveToCurrentPatrolPoint()
 	AAIController* AICon = Cast<AAIController>(GetController());
 	if (!AICon) return false;
 
-	AICon->MoveToActor(Target, PatrolAcceptanceRadius);
+	AICon->MoveToActor(Target, PatrolAcceptanceRadius-100);
 	return true;
 }
 
@@ -529,7 +529,7 @@ bool AEnemy::MoveToNextPatrolPoint()
 	AAIController* AICon = Cast<AAIController>(GetController());
 	if (!AICon) return false;
 
-	AICon->MoveToActor(Next, PatrolAcceptanceRadius);
+	AICon->MoveToActor(Next, PatrolAcceptanceRadius-100);
 	return true;
 }
 

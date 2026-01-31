@@ -26,9 +26,11 @@ ABeSmallMask::ABeSmallMask()
 	}
 	
 	// 确保组件可见
-	MeshComponent->SetVisibility(true);
-	MeshComponent->SetHiddenInGame(false);
-	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	MeshComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+	MeshComponent->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+	MeshComponent->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Overlap);
+	MeshComponent->SetCollisionObjectType(ECC_WorldStatic);
 	
 	
 }
