@@ -63,7 +63,8 @@ Aggj_maskCharacter::Aggj_maskCharacter()
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 
-	
+	OriginalCapsuleRadius = GetCapsuleComponent()->GetUnscaledCapsuleRadius();
+	OriginalCapsuleHeight = GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight();
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 }
@@ -243,6 +244,47 @@ void Aggj_maskCharacter::WearDragMask(const FInputActionValue& Value)
 	bWearDragMask = true;
 }
 
+bool Aggj_maskCharacter::CanGrowBack()
+{
+	if(!bSmall) return true;
+    
+    FVector CurrentLocation = GetActorLocation();
+    FCollisionQueryParams Params;
+    Params.AddIgnoredActor(this);
+	
+    float CheckRadius = OriginalCapsuleRadius * 1.2f;
+	
+    TArray<FVector> CheckDirections = {
+        FVector(1, 0, 0),   
+        FVector(-1, 0, 0),  
+        FVector(0, 1, 0),   
+        FVector(0, -1, 0)   
+    };
+    
+    for(const FVector& Dir : CheckDirections)
+    {
+        FVector WallTraceStart = CurrentLocation + FVector(0, 0, 30.0f); // 在腰部高度检测
+        FVector WallTraceEnd = WallTraceStart + Dir * CheckRadius;
+        
+        FHitResult WallHit;
+        if(GetWorld()->LineTraceSingleByChannel(WallHit, WallTraceStart, WallTraceEnd, ECC_Visibility, Params))
+        {
+            AActor* WallActor = WallHit.GetActor();
+            if(WallActor && !WallActor->IsA(ADraggableCube::StaticClass()))
+            {
+                
+                float DotProduct = FMath::Abs(FVector::DotProduct(WallHit.Normal, FVector::UpVector));
+                if(DotProduct < 0.7f) 
+                {
+                    return false;
+                }
+            }
+        }
+    }
+    
+    return true;
+}
+
 void Aggj_maskCharacter::ApplySkill(const FInputActionValue& Value)
 {
 	
@@ -261,8 +303,11 @@ void Aggj_maskCharacter::ApplySkill(const FInputActionValue& Value)
 		}
 		else
 		{
-			SetActorScale3D(FVector(1.f, 1.f, 1.f));
-			bSmall = false;
+			if(CanGrowBack())
+			{
+				SetActorScale3D(FVector(1.f, 1.f, 1.f));
+				bSmall = false;
+			}
 		}
 	}
 	else if (bWearOpenDoorMask)

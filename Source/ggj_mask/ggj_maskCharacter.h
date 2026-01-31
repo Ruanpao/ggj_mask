@@ -86,6 +86,7 @@ protected:
 	void WearOpenDoorMask(const FInputActionValue& Value);
 
 	void WearDragMask(const FInputActionValue& Value);
+	bool CanGrowBack();
 
 	void ApplySkill(const FInputActionValue& Value);
 
@@ -120,6 +121,16 @@ private:
 
 	bool bSmall = false;
 
+	// 碰撞检测相关
+	float OriginalCapsuleRadius;
+	float OriginalCapsuleHeight;
+	float SmallCapsuleRadius = 4.2f;
+	float SmallCapsuleHeight = 9.6f;
+    
+	// 检测是否可以变大的缓存
+	bool bCanGrowBack = true;
+	float GrowCheckRadius = 100.0f;
+	
 	ADraggableCube* CurrentDraggableCube;
 };
 
