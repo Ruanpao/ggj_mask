@@ -14,6 +14,7 @@ class UCameraComponent;
 class UInputMappingContext;
 class UInputAction;
 struct FInputActionValue;
+class UUserWidget; // forward-declare
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -71,6 +72,25 @@ public:
 
 	bool IsWearOpenDoorMask() const { return bWearOpenDoorMask; }
 	virtual void Tick(float DeltaTime) override;
+
+	// New: Defeat UI widget class (assign the Blueprint widget in editor)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+	TSubclassOf<UUserWidget> DefeatWidgetClass;
+
+	// Runtime instance (transient)
+	UPROPERTY(Transient)
+	UUserWidget* DefeatWidgetInstance;
+
+	// Whether the character has been defeated (so overlap only triggers once)
+	bool bIsDefeated = false;
+
+	// Overlap handler for capsule begin overlap
+	UFUNCTION()
+	void OnCapsuleBeginOverlap(class UPrimitiveComponent* OverlappedComponent, class AActor* OtherActor, class UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+	// Show the defeat UI and switch input to UI-only
+	void ShowDefeatUI();
+
 protected:
 
 	/** Called for movement input */

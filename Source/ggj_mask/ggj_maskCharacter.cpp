@@ -15,6 +15,12 @@
 #include "ggj_mask/Public/Masks/BeSmallMask.h"
 #include "ggj_mask/Public/Masks/OpenDoorMask.h"
 #include "Kismet/GameplayStatics.h"
+#include "GameFramework/PlayerController.h"
+#include "Blueprint/UserWidget.h"
+#include "GameFramework/PlayerController.h"
+#include "Components/CapsuleComponent.h"
+
+#include "Enemies/Enemy.h"
 #include "Masks/DragMask.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
@@ -77,6 +83,56 @@ void Aggj_maskCharacter::BeginPlay()
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
 		PC->bShowMouseCursor = true;
+	}
+
+	// Bind capsule overlap to detect enemies
+	if (GetCapsuleComponent())
+	{
+		GetCapsuleComponent()->OnComponentBeginOverlap.AddDynamic(this, &Aggj_maskCharacter::OnCapsuleBeginOverlap);
+	}
+}
+
+// Overlap handler
+void Aggj_maskCharacter::OnCapsuleBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if (bIsDefeated) return;
+	if (!OtherActor) return;
+
+	// Check if overlapping an Enemy
+	if (OtherActor->IsA(AEnemy::StaticClass()))
+	{
+		// Mark defeated and show UI
+		bIsDefeated = true;
+		ShowDefeatUI();
+	}
+}
+
+void Aggj_maskCharacter::ShowDefeatUI()
+{
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC) return;
+
+	if (DefeatWidgetClass)
+	{
+		if (!DefeatWidgetInstance)
+		{
+			DefeatWidgetInstance = CreateWidget<UUserWidget>(PC, DefeatWidgetClass);
+			if (DefeatWidgetInstance)
+			{
+				DefeatWidgetInstance->AddToViewport();
+
+				// Switch input to UI only
+				FInputModeUIOnly InputMode;
+				InputMode.SetWidgetToFocus(DefeatWidgetInstance->TakeWidget());
+				InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+				PC->SetInputMode(InputMode);
+				PC->bShowMouseCursor = true;
+			}
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemplateCharacter, Warning, TEXT("DefeatWidgetClass not set on %s"), *GetNameSafe(this));
 	}
 }
 
