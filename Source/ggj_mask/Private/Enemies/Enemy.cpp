@@ -289,7 +289,7 @@ void AEnemy::Tick(float DeltaTime)
 				FVector UseNext = NextLoc; // world-space next point
 				UE_LOG(LogTemp, Log, TEXT("SplineTick: Arrived at MoveTarget. Advancing %d -> %d actor=%s splineTarget=%s nextTarget=%s dist=%.2fcm accept=%.2fcm"),
 					Old, NewIdx, *ActorLoc.ToCompactString(), *TargetLoc.ToCompactString(), *NextLoc.ToCompactString(), Dist, Accept);
-				EPathFollowingRequestResult::Type MoveRes = AICon->MoveToLocation(UseNext, SplinePatrolAcceptanceRadius-100);
+				EPathFollowingRequestResult::Type MoveRes = AICon->MoveToLocation(UseNext, 10);
 				UE_LOG(LogTemp, Log, TEXT("SplineTick: MoveTo requested nextTarget=%s result=%d"), *UseNext.ToCompactString(), (int)MoveRes);
 				if (PF && PF->GetPath())
 				{
@@ -315,7 +315,7 @@ void AEnemy::Tick(float DeltaTime)
                 if (!bMoving)
                 {
                     UE_LOG(LogTemp, Warning, TEXT("SplineTick: Re-request MoveTo. Actor=%s splineTarget=%s moveTarget=%s pathEnd=%s distToMoveTarget=%.2fcm accept=%.2fcm"), *ActorLoc.ToCompactString(), *TargetLoc.ToCompactString(), *MoveTarget.ToCompactString(), *PathEnd.ToCompactString(), Dist, Accept);
-                    EPathFollowingRequestResult::Type MoveRes = AICon->MoveToLocation(MoveTarget, SplinePatrolAcceptanceRadius-100);
+                    EPathFollowingRequestResult::Type MoveRes = AICon->MoveToLocation(MoveTarget, 10);
                     UE_LOG(LogTemp, Warning, TEXT("SplineTick: MoveTo requested target=%s res=%d"), *MoveTarget.ToCompactString(), (int)MoveRes);
                     if (PF && PF->GetPath())
                     {
@@ -549,7 +549,7 @@ void AEnemy::StartSplinePatrol()
 
 	FVector UseTarget = Target; // Use world-space target
 
-	EPathFollowingRequestResult::Type MoveRes = AICon->MoveToLocation(UseTarget, SplinePatrolAcceptanceRadius-100);
+	EPathFollowingRequestResult::Type MoveRes = AICon->MoveToLocation(UseTarget, 10);
 	UE_LOG(LogTemp, Log, TEXT("StartSplinePatrol: %s starting spline patrol. StartIndex=%d NumPoints=%d MoveRes=%d MoveToTarget=(%s) splineTarget=(%s)"), *GetNameSafe(this), SplineCurrentIndex, Num, (int)MoveRes, *UseTarget.ToCompactString(), *Target.ToCompactString());
 	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.5f, FColor::Cyan, FString::Printf(TEXT("SplinePatrol: start idx %d res=%d"), SplineCurrentIndex, (int)MoveRes));
 }
@@ -582,7 +582,7 @@ void AEnemy::OnPathFollowingRequestFinished(FAIRequestID RequestID, const FPathF
 		int32 OldIndex = SplineCurrentIndex;
 		int32 NewIndex = AdvanceSplineIndex();
 		FVector NextLoc = GetSplinePointLocation(SplineCurrentIndex);
-		EPathFollowingRequestResult::Type MoveRes = AICon->MoveToLocation(NextLoc, SplinePatrolAcceptanceRadius-100);
+		EPathFollowingRequestResult::Type MoveRes = AICon->MoveToLocation(NextLoc, 10);
 		UE_LOG(LogTemp, Log, TEXT("OnPathFollowingRequestFinished: Advancing spline %d -> %d, MoveRes=%d"), OldIndex, NewIndex, (int)MoveRes);
 		if (GEngine) GEngine->AddOnScreenDebugMessage((int)GetUniqueID(), 2.0f, FColor::Green, FString::Printf(TEXT("SplinePatrol: advanced to %d"), NewIndex));
 	}
