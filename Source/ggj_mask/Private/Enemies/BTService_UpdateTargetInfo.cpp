@@ -74,11 +74,26 @@ void UBTService_UpdateTargetInfo::TickNode(UBehaviorTreeComponent& OwnerComp, ui
         }
     };
 
-    UAIPerceptionComponent* Perc = Pawn->FindComponentByClass<UAIPerceptionComponent>();
+    // Prefer the AIController's perception component (controllers should own perception).
+    UAIPerceptionComponent* Perc = nullptr;
+    if (AICon)
+    {
+        Perc = AICon->FindComponentByClass<UAIPerceptionComponent>();
+    }
+    // Fallback: if none on controller, check the pawn (legacy / BP setups)
+    if (!Perc && Pawn)
+    {
+        Perc = Pawn->FindComponentByClass<UAIPerceptionComponent>();
+    }
+
     TArray<AActor*> PerceivedActors;
     if (Perc)
     {
         Perc->GetCurrentlyPerceivedActors(UAISense_Sight::StaticClass(), PerceivedActors);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Verbose, TEXT("BTService_UpdateTargetInfo: No perception component found for AICon=%s Pawn=%s"), *GetNameSafe(AICon), *GetNameSafe(Pawn));
     }
 
     Aggj_maskCharacter* SeenPlayer = nullptr;

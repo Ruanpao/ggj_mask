@@ -85,26 +85,22 @@ void Aggj_maskCharacter::BeginPlay()
 		PC->bShowMouseCursor = true;
 	}
 
-	// Bind capsule overlap to detect enemies
-	if (GetCapsuleComponent())
-	{
-		GetCapsuleComponent()->OnComponentBeginOverlap.AddDynamic(this, &Aggj_maskCharacter::OnCapsuleBeginOverlap);
-	}
+	// NOTE: We no longer bind capsule overlap to detect enemies here.
+	// Enemy now has an InteractionBox that will handle overlapping the player and trigger ShowDefeatUI.
+	// Keeping this code commented out for clarity; do not enable.
+	// if (GetCapsuleComponent())
+	// {
+	//     GetCapsuleComponent()->OnComponentBeginOverlap.AddDynamic(this, &Aggj_maskCharacter::OnCapsuleBeginOverlap);
+	// }
 }
 
 // Overlap handler
 void Aggj_maskCharacter::OnCapsuleBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	if (bIsDefeated) return;
-	if (!OtherActor) return;
-
-	// Check if overlapping an Enemy
-	if (OtherActor->IsA(AEnemy::StaticClass()))
-	{
-		// Mark defeated and show UI
-		bIsDefeated = true;
-		ShowDefeatUI();
-	}
+	// Capsule overlaps no longer trigger defeat UI. Interaction is handled by enemies' InteractionBox.
+	// Keep function for future use or debug.
+	UE_LOG(LogTemplateCharacter, Verbose, TEXT("OnCapsuleBeginOverlap: Ignored overlap with %s"), *GetNameSafe(OtherActor));
+	return;
 }
 
 void Aggj_maskCharacter::ShowDefeatUI()
