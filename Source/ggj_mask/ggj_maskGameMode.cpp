@@ -32,8 +32,7 @@ void Aggj_maskGameMode::BeginPlay()
 			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock); // 关键：不锁定鼠标
 			InputMode.SetHideCursorDuringCapture(false); // 关键：捕获时不隐藏光标
 			PC->SetInputMode(InputMode);
-			PC->bShowMouseCursor = true
-			;
+			PC->bShowMouseCursor = true;
 			UE_LOG(LogTemp, Log, TEXT("Aggj_maskGameMode::BeginPlay - input mode set to GameOnly, mouse cursor shown."));
 		}
 	}
