@@ -3,7 +3,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Masks/BasicMask.h"
+#include "GameFramework/Actor.h"
+#include "ggj_mask/Public/InteractInterface.h"
+
 #include "OpenDoorMask.generated.h"
 
 /**
