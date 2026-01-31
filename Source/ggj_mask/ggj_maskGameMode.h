@@ -13,7 +13,6 @@ class Aggj_maskGameMode : public AGameModeBase
 
 public:
 	Aggj_maskGameMode();
+
+	virtual void BeginPlay() override;
 };
-
-
-
