@@ -129,7 +129,7 @@ void ADraggableCube::UpdateDragging(const FVector& TargetPosition)
         
 		// 添加位置平滑过渡
 		FVector CurrentLocation = GetActorLocation();
-		float MaxMoveDistance = 500.0f;
+		float MaxMoveDistance = 10.0f;
         
 		if(FVector::Dist(CurrentLocation, ProjectedLocation) > MaxMoveDistance)
 		{
