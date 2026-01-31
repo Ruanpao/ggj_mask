@@ -472,13 +472,13 @@ void Aggj_maskCharacter::StartDragging(const FInputActionValue& Value)
 			{
 				CurrentDraggableCube = HitCube;
 				CurrentDraggableCube->StartDragging(this);
-				
+
 				UE_LOG(LogTemplateCharacter, Warning, TEXT("成功开始拖拽方块: %s"), *HitCube->GetName());
-				
+
 			}
-			
+
 		}
-		
+
 	}
 	
 }

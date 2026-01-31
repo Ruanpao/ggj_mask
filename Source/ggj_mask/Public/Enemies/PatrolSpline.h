@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Components/SplineComponent.h"
 #include "PatrolSpline.generated.h"
 
 class USplineComponent;
@@ -16,6 +17,7 @@ class GGJ_MASK_API APatrolSpline : public AActor
 public:
 	APatrolSpline();
 
+	// Spline component for patrol path
 	UPROPERTY(VisibleAnywhere, Category = "Spline")
 	USplineComponent* SplineComponent;
 

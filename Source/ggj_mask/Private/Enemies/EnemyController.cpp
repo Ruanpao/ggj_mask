@@ -111,7 +111,7 @@ void AEnemyController::StartBehaviorTreeWhenNavReady()
 
 void AEnemyController::CheckNavAndStart()
 {
-	UE_LOG(LogTemp, Verbose, TEXT("CheckNavAndStart: Checking nav for %s..."), *GetNameSafe(ControlledEnemy));
+	UE_LOG(LogTemp, Warning, TEXT("CheckNavAndStart: Checking nav for %s..."), *GetNameSafe(ControlledEnemy));
 	if (bBehaviorTreeStarted) { GetWorldTimerManager().ClearTimer(NavCheckTimer); UE_LOG(LogTemp, Verbose, TEXT("CheckNavAndStart: already started, clearing timer")); return; }
 	if (!GetWorld()) { UE_LOG(LogTemp, Warning, TEXT("CheckNavAndStart: No World available")); return; }
 

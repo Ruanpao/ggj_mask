@@ -5,6 +5,8 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
 #include "Components/BoxComponent.h"
+#include "Components/SphereComponent.h"
+#include "GameFramework/FloatingPawnMovement.h"
 
 // Forward declare AI path-following types to avoid heavy includes in header
 struct FAIRequestID;
@@ -14,9 +16,10 @@ struct FPathFollowingResult;
 //class UAIPerceptionComponent;
 class UAISenseConfig_Sight;
 class UBehaviorTree;
-class USphereComponent;
-class UFloatingPawnMovement;
 class AMonitorDoor; // forward-declare MonitorDoor actor
+class ABeSmallMask;
+class AOpenDoorMask;
+class ADragMask;
 
 #include "Enemy.generated.h"
 
@@ -56,6 +59,26 @@ public:
 	bool CanBeSmall;
 	UPROPERTY(EditAnywhere, Category = "Mask")
 	bool CanOpenDoor;
+
+	// NEW: flags and BP class references for masks (editable in Blueprint)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mask")
+	bool CanDropSmallMask = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mask")
+	bool CanDropOpenDoorMask = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mask")
+	bool CanDropDragMask = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mask")
+	TSubclassOf<ABeSmallMask> SmallMaskBP;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mask")
+	TSubclassOf<AOpenDoorMask> OpenDoorMaskBP;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mask")
+	TSubclassOf<ADragMask> DragMaskBP;
+
 	// UPROPERTY(EditAnywhere, Category = "Mask")
 	// bool CanDisableTraps;
 	//

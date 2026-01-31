@@ -6,12 +6,12 @@
 
 ADraggableCube::ADraggableCube()
 {
- 	
+
 	PrimaryActorTick.bCanEverTick = true;
 
 	// 创建根组件
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
-	
+
 	// 创建方块网格
 	CubeMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CubeMesh"));
 	CubeMesh->SetupAttachment(RootComponent);
@@ -21,7 +21,7 @@ ADraggableCube::ADraggableCube()
 void ADraggableCube::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
 }
 
 
@@ -44,7 +44,7 @@ void ADraggableCube::Tick(float DeltaTime)
 				0,
 				2.0f
 			);
-			
+
 			// 绘制轨道点
 			DrawDebugSphere(
 				GetWorld(),
@@ -58,7 +58,7 @@ void ADraggableCube::Tick(float DeltaTime)
 				2.0f
 			);
 		}
-		
+
 		// 绘制最后一个点
 		if (TrackPoints.Num() > 0)
 		{
@@ -86,10 +86,10 @@ void ADraggableCube::StartDragging(AActor* Dragger)
 
 	bIsBeingDragged = true;
 	DraggingActor = Dragger;
-	
+
 	DragStartPosition = GetActorLocation();
 	DragStartHeight = GetActorLocation().Z;
-	
+
 	if(bUseTrack && TrackPoints.Num() >= 2)
 	{
 		CurrentTrackSegmentIndex = FindNearestSegmentIndex(DragStartPosition);
@@ -117,20 +117,20 @@ void ADraggableCube::UpdateDragging(const FVector& TargetPosition)
 	}
 
 	FVector NewLocation = FVector(
-		TargetPosition.X,        
-		TargetPosition.Y,        
-		DragStartHeight         
+		TargetPosition.X,
+		TargetPosition.Y,
+		DragStartHeight
 	);
 
 	if (bUseTrack && TrackPoints.Num() >= 2)
 	{
 		// 先计算投影位置
 		FVector ProjectedLocation = ProjectToTrack(NewLocation);
-        
+
 		// 添加位置平滑过渡
 		FVector CurrentLocation = GetActorLocation();
 		float MaxMoveDistance = 500.0f;
-        
+
 		if(FVector::Dist(CurrentLocation, ProjectedLocation) > MaxMoveDistance)
 		{
 			// 如果距离过大，使用插值平滑移动
@@ -208,7 +208,7 @@ FVector ADraggableCube::FindNearestPointOnSegment(const FVector& Position)
 	FVector NearestPoint;
 	float MinDistance = FLT_MAX;
 	int32 NearestSegmentIndex = -1;
-	
+
 	for(int32 i = 0; i < TrackPoints.Num() - 1; i++)
 	{
 		FVector PointOnSegment = FMath::ClosestPointOnSegment(Position, TrackPoints[i], TrackPoints[i + 1]);
@@ -220,12 +220,12 @@ FVector ADraggableCube::FindNearestPointOnSegment(const FVector& Position)
 			NearestSegmentIndex = i;
 		}
 	}
-	
+
 	if(NearestSegmentIndex != -1)
 	{
 		CurrentTrackSegmentIndex = NearestSegmentIndex;
 	}
-	
+
 	return NearestPoint;
 }
 
