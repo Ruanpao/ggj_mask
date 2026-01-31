@@ -31,7 +31,7 @@ protected:
 	// Forward perception updates to the pawn
 	UFUNCTION()
 	void OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
-	
+
 	// Start behavior tree once nav is ready
 	void StartBehaviorTreeWhenNavReady();
 	void CheckNavAndStart();

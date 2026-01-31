@@ -19,6 +19,12 @@
 #include "NavigationSystem.h"
 #include "NavigationSystemTypes.h"
 #include "BehaviorTree/BehaviorTree.h"
+// include masks and draggable cube for spawning/overlap handling
+#include "Masks/BeSmallMask.h"
+#include "Masks/OpenDoorMask.h"
+#include "Masks/DragMask.h"
+#include "DraggableCube.h"
+#include "UObject/UnrealType.h" // for FProperty/FBoolProperty
 
 // Sets default values
 AEnemy::AEnemy()
@@ -649,4 +655,116 @@ void AEnemy::OnInteractionOverlapBegin(UPrimitiveComponent* OverlappedComp, AAct
         // Optionally disable enemy movement or other effects here
         // e.g., StopSplinePatrol();
     }
+
+    // If overlapped a draggable cube, spawn mask pickups according to flags then destroy this enemy
+    ADraggableCube* DC = Cast<ADraggableCube>(OtherActor);
+    if (DC)
+    {
+        UE_LOG(LogTemp, Log, TEXT("AEnemy::OnInteractionOverlapBegin - overlapped DraggableCube %s, spawning masks for %s"), *GetNameSafe(DC), *GetNameSafe(this));
+
+        FActorSpawnParameters SpawnParams;
+        SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+        SpawnParams.Owner = this;
+
+        FVector SpawnLoc = GetActorLocation();
+        FRotator SpawnRot = GetActorRotation();
+
+        UWorld* World = GetWorld();
+        if (!World)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("AEnemy::OnInteractionOverlapBegin - no World to spawn masks"));
+            return;
+        }
+
+        // Lambda: try to read a bool property from a class default object using candidate names
+        auto ReadBoolFromCDO = [](UClass* InClass, const TArray<FName>& Candidates, bool& OutVal)->bool
+        {
+            if (!InClass) return false;
+            UObject* CDO = InClass->GetDefaultObject();
+            if (!CDO) return false;
+            for (const FName& Name : Candidates)
+            {
+                FProperty* Prop = InClass->FindPropertyByName(Name);
+                if (!Prop) continue;
+                if (FBoolProperty* BoolProp = CastField<FBoolProperty>(Prop))
+                {
+                    OutVal = BoolProp->GetPropertyValue_InContainer(CDO);
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        // Small mask: prefer blueprint flag if BP assigned, otherwise use enemy fallback or spawn C++ class
+        if (SmallMaskBP)
+        {
+            TArray<FName> Candidates = { FName(TEXT("CanDropSmallMask")), FName(TEXT("bCanDropSmallMask")), FName(TEXT("bShouldDropSmall")), FName(TEXT("bShouldDrop")), FName(TEXT("bCanDrop")) };
+            bool bVal = false;
+            bool bHasFlag = ReadBoolFromCDO(SmallMaskBP.Get(), Candidates, bVal);
+            if (bHasFlag ? bVal : CanDropSmallMask)
+            {
+                AActor* Spawned = World->SpawnActor<AActor>(SmallMaskBP.Get(), SpawnLoc, SpawnRot, SpawnParams);
+                UE_LOG(LogTemp, Log, TEXT("AEnemy: spawned SmallMask via BP class %s actor=%s (bpFlag=%s, enemyFallback=%s)"), *GetNameSafe(SmallMaskBP.Get()), *GetNameSafe(Spawned), bHasFlag ? (bVal ? TEXT("true") : TEXT("false")) : TEXT("n/a"), CanDropSmallMask?TEXT("true"):TEXT("false"));
+            }
+            else
+            {
+                UE_LOG(LogTemp, Log, TEXT("AEnemy: SmallMaskBP %s indicated no spawn (bpFlag=%s, enemyFallback=%s)"), *GetNameSafe(SmallMaskBP.Get()), bHasFlag?(bVal?TEXT("true"):TEXT("false")):TEXT("n/a"), CanDropSmallMask?TEXT("true"):TEXT("false"));
+            }
+        }
+        else if (CanDropSmallMask)
+        {
+            ABeSmallMask* Small = World->SpawnActor<ABeSmallMask>(ABeSmallMask::StaticClass(), SpawnLoc, SpawnRot, SpawnParams);
+            UE_LOG(LogTemp, Log, TEXT("AEnemy: spawned SmallMask (C++) actor=%s via enemy fallback"), *GetNameSafe(Small));
+        }
+
+        // Open door mask
+        if (OpenDoorMaskBP)
+        {
+            TArray<FName> Candidates = { FName(TEXT("CanDropOpenDoorMask")), FName(TEXT("bCanDropOpenDoorMask")), FName(TEXT("bShouldDropOpenDoor")), FName(TEXT("bShouldDrop")), FName(TEXT("bCanDrop")) };
+            bool bVal = false;
+            bool bHasFlag = ReadBoolFromCDO(OpenDoorMaskBP.Get(), Candidates, bVal);
+            if (bHasFlag ? bVal : CanDropOpenDoorMask)
+            {
+                AActor* Spawned = World->SpawnActor<AActor>(OpenDoorMaskBP.Get(), SpawnLoc, SpawnRot, SpawnParams);
+                UE_LOG(LogTemp, Log, TEXT("AEnemy: spawned OpenDoorMask via BP class %s actor=%s (bpFlag=%s, enemyFallback=%s)"), *GetNameSafe(OpenDoorMaskBP.Get()), *GetNameSafe(Spawned), bHasFlag ? (bVal ? TEXT("true") : TEXT("false")) : TEXT("n/a"), CanDropOpenDoorMask?TEXT("true"):TEXT("false"));
+            }
+            else
+            {
+                UE_LOG(LogTemp, Log, TEXT("AEnemy: OpenDoorMaskBP %s indicated no spawn (bpFlag=%s, enemyFallback=%s)"), *GetNameSafe(OpenDoorMaskBP.Get()), bHasFlag?(bVal?TEXT("true"):TEXT("false")):TEXT("n/a"), CanDropOpenDoorMask?TEXT("true"):TEXT("false"));
+            }
+        }
+        else if (CanDropOpenDoorMask)
+        {
+            AOpenDoorMask* Open = World->SpawnActor<AOpenDoorMask>(AOpenDoorMask::StaticClass(), SpawnLoc, SpawnRot, SpawnParams);
+            UE_LOG(LogTemp, Log, TEXT("AEnemy: spawned OpenDoorMask (C++) actor=%s via enemy fallback"), *GetNameSafe(Open));
+        }
+
+        // Drag mask
+        if (DragMaskBP)
+        {
+            TArray<FName> Candidates = { FName(TEXT("CanDropDragMask")), FName(TEXT("bCanDropDragMask")), FName(TEXT("bShouldDropDrag")), FName(TEXT("bShouldDrop")), FName(TEXT("bCanDrop")) };
+            bool bVal = false;
+            bool bHasFlag = ReadBoolFromCDO(DragMaskBP.Get(), Candidates, bVal);
+            if (bHasFlag ? bVal : CanDropDragMask)
+            {
+                AActor* Spawned = World->SpawnActor<AActor>(DragMaskBP.Get(), SpawnLoc, SpawnRot, SpawnParams);
+                UE_LOG(LogTemp, Log, TEXT("AEnemy: spawned DragMask via BP class %s actor=%s (bpFlag=%s, enemyFallback=%s)"), *GetNameSafe(DragMaskBP.Get()), *GetNameSafe(Spawned), bHasFlag ? (bVal ? TEXT("true") : TEXT("false")) : TEXT("n/a"), CanDropDragMask?TEXT("true"):TEXT("false"));
+            }
+            else
+            {
+                UE_LOG(LogTemp, Log, TEXT("AEnemy: DragMaskBP %s indicated no spawn (bpFlag=%s, enemyFallback=%s)"), *GetNameSafe(DragMaskBP.Get()), bHasFlag?(bVal?TEXT("true"):TEXT("false")):TEXT("n/a"), CanDropDragMask?TEXT("true"):TEXT("false"));
+            }
+        }
+        else if (CanDropDragMask)
+        {
+            ADragMask* Drag = World->SpawnActor<ADragMask>(ADragMask::StaticClass(), SpawnLoc, SpawnRot, SpawnParams);
+            UE_LOG(LogTemp, Log, TEXT("AEnemy: spawned DragMask (C++) actor=%s via enemy fallback"), *GetNameSafe(Drag));
+        }
+
+        // Destroy this enemy after spawning
+        UE_LOG(LogTemp, Log, TEXT("AEnemy: %s destroyed after dropping masks"), *GetNameSafe(this));
+        Destroy();
+        return;
+    }
+
 }
