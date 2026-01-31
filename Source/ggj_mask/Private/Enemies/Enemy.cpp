@@ -814,11 +814,15 @@ void AEnemy::OnInteractionOverlapBegin(UPrimitiveComponent* OverlappedComp, AAct
 
         // Destroy this enemy after spawning
         UE_LOG(LogTemp, Log, TEXT("AEnemy: %s destroyed after dropping masks"), *GetNameSafe(this));
+    	RemoveWornMask();
         Destroy();
+        
         return;
     }
 
 }
+
+
 void AEnemy::WearMaskToFace(TSubclassOf<AActor> MaskClass)
 {
 	RemoveWornMask();
