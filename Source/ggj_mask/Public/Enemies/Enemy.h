@@ -4,7 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
-#include "Enemy.generated.h"
+
+// Forward declare AI path-following types to avoid heavy includes in header
+struct FAIRequestID;
+struct FPathFollowingResult;
 
 // Forward declarations to avoid requiring include paths in the header
 class UAIPerceptionComponent;
@@ -13,6 +16,8 @@ class UBehaviorTree;
 class USphereComponent;
 class UFloatingPawnMovement;
 class AMonitorDoor; // forward-declare MonitorDoor actor
+
+#include "Enemy.generated.h"
 
 UCLASS()
 class GGJ_MASK_API AEnemy : public APawn
@@ -59,7 +64,7 @@ public:
 	// bool CanDisableTraps;
 	//
 
-
+	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 

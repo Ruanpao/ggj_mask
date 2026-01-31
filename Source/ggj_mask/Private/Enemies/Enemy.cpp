@@ -18,6 +18,8 @@
 #include "Enemies/PatrolSpline.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "Engine/Engine.h"
+#include "NavigationSystem.h"
+#include "NavigationSystemTypes.h"
 
 // Sets default values
 AEnemy::AEnemy()
@@ -169,7 +171,6 @@ void AEnemy::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// Draw debug vision: center line, left/right FOV lines, and sight radius sphere
 	UWorld* World = GetWorld();
 	if (!World) return;
 
@@ -184,124 +185,115 @@ void AEnemy::Tick(float DeltaTime)
 
 	FVector Forward = GetActorForwardVector();
 	DrawDebugLine(World, Eye, Eye + Forward * SightRadius, FColor::Green, false, 0.0f, 0, 1.0f);
-	// Left and right edge lines
 	FVector LeftDir = Forward.RotateAngleAxis(-PeripheralAngle, FVector::UpVector).GetSafeNormal();
 	FVector RightDir = Forward.RotateAngleAxis(PeripheralAngle, FVector::UpVector).GetSafeNormal();
 	DrawDebugLine(World, Eye, Eye + LeftDir * SightRadius, FColor::Yellow, false, 0.0f, 0, 1.0f);
 	DrawDebugLine(World, Eye, Eye + RightDir * SightRadius, FColor::Yellow, false, 0.0f, 0, 1.0f);
-	// Sight radius sphere
 	DrawDebugSphere(World, Eye, SightRadius, 24, FColor::Blue, false, 0.0f, 0, 0.5f);
 
-	// After vision/debug drawing, handle spline patrol
-	if (bUseSplinePatrol && PatrolSpline)
-	{
-		AAIController* AICon = Cast<AAIController>(GetController());
-		if (!AICon) return;
-
-		UBlackboardComponent* BBComp = AICon->GetBlackboardComponent();
-		if (!BBComp) return;
-
-		bool bHasTarget = BBComp->GetValueAsBool(TEXT("HasTarget"));
-		UE_LOG(LogTemp, Log, TEXT("SplinePatrol Tick: Enemy=%s UseSpline=%d NumPoints=%d CurrentIndex=%d HasTarget=%d"), *GetNameSafe(this), (int)bUseSplinePatrol, PatrolSpline ? PatrolSpline->GetNumPoints() : 0, SplineCurrentIndex, (int)bHasTarget);
-		if (GEngine) GEngine->AddOnScreenDebugMessage((int)GetUniqueID(), 0.5f, FColor::Cyan, FString::Printf(TEXT("SplineTick: idx=%d HasTarget=%d"), SplineCurrentIndex, (int)bHasTarget));
-
-		if (bHasTarget)
-		{
-			// let chase logic handle movement
-			UE_LOG(LogTemp, Verbose, TEXT("SplinePatrol Tick: HasTarget true, skipping spline patrol for %s"), *GetNameSafe(this));
-			return;
-		}
-
-		// Move to current spline point if not already moving
-		FVector TargetLoc = GetSplinePointLocation(SplineCurrentIndex);
-		float DistSq = FVector::DistSquared(GetActorLocation(), TargetLoc);
-		UE_LOG(LogTemp, Log, TEXT("SplinePatrol Tick: Enemy=%s CurrentIndex=%d TargetLoc=(%s) DistSq=%f AcceptanceSq=%f"), *GetNameSafe(this), SplineCurrentIndex, *TargetLoc.ToCompactString(), DistSq, FMath::Square(SplinePatrolAcceptanceRadius));
-		DrawDebugSphere(GetWorld(), TargetLoc, 40.0f, 8, FColor::Purple, false, 0.0f);
-
-		// If we're already within acceptance, just log and wait for OnRequestFinished (or initial AlreadyAtGoal logic)
-		if (DistSq <= FMath::Square(SplinePatrolAcceptanceRadius))
-		{
-			UE_LOG(LogTemp, Log, TEXT("SplinePatrol Tick: Enemy=%s is within acceptance radius of spline idx=%d (dist=%f). Waiting for path completion event."), *GetNameSafe(this), SplineCurrentIndex, FMath::Sqrt(DistSq));
-			// don't advance here - advancement is handled by OnPathFollowingRequestFinished or StartSplinePatrol for AlreadyAtGoal
-			// still, reset retry counters
-			SplineIdleTimeAccum = 0.0f;
-			SplineMoveRetryCount = 0;
-		}
-		else
-		{
-			EPathFollowingStatus::Type Status = AICon->GetMoveStatus();
-			const TCHAR* StatusStr = TEXT("Unknown");
-			switch (Status)
-			{
-				case EPathFollowingStatus::Idle: StatusStr = TEXT("Idle"); break;
-				case EPathFollowingStatus::Waiting: StatusStr = TEXT("Waiting"); break;
-				case EPathFollowingStatus::Paused: StatusStr = TEXT("Paused"); break;
-				case EPathFollowingStatus::Moving: StatusStr = TEXT("Moving"); break;
-			}
-			UE_LOG(LogTemp, Log, TEXT("SplinePatrol Tick: Enemy=%s MoveStatus=%s"), *GetNameSafe(this), StatusStr);
-
-			// ensure we have an active move request
-			if (Status != EPathFollowingStatus::Moving)
-			{
-				SplineIdleTimeAccum += DeltaTime;
-				// if idle for more than 0.5s, try resend move; back off after a few retries
-				if (SplineIdleTimeAccum > 0.5f && SplineMoveRetryCount < 3)
-				{
-					EPathFollowingRequestResult::Type MoveRes = AICon->MoveToLocation(TargetLoc, SplinePatrolAcceptanceRadius);
-					SplineMoveRetryCount++;
-					SplineIdleTimeAccum = 0.0f;
-					UE_LOG(LogTemp, Warning, TEXT("SplinePatrol Tick: Enemy=%s retry MoveToLocation idx=%d attempt=%d result=%d"), *GetNameSafe(this), SplineCurrentIndex, SplineMoveRetryCount, (int)MoveRes);
-					if (GEngine) GEngine->AddOnScreenDebugMessage((int)GetUniqueID(), 0.7f, FColor::Yellow, FString::Printf(TEXT("SplinePatrol: retry %d idx=%d res=%d"), SplineMoveRetryCount, SplineCurrentIndex, (int)MoveRes));
-				}
-				else if (SplineMoveRetryCount >= 3)
-				{
-					UE_LOG(LogTemp, Error, TEXT("SplinePatrol Tick: Enemy=%s failed to move to spline idx=%d after %d retries; switching to manual movement"), *GetNameSafe(this), SplineCurrentIndex, SplineMoveRetryCount);
-					// switch to manual movement along spline as a fallback
-					SplineIdleTimeAccum = 0.0f;
-					SplineMoveRetryCount = 0;
-					SplineManualMoving = true;
-					if (GEngine) GEngine->AddOnScreenDebugMessage((int)GetUniqueID(), 2.0f, FColor::Red, TEXT("SplinePatrol: entering manual movement fallback"));
-				}
-			}
-			else
-			{
-				// successful moving - reset retry counters
-				SplineIdleTimeAccum = 0.0f;
-				SplineMoveRetryCount = 0;
-			}
-		}
-
-		// If in manual movement fallback, nudge pawn toward target using AddMovementInput
-		if (SplineManualMoving)
-		{
-			FVector ToTarget = (TargetLoc - GetActorLocation());
-			ToTarget.Z = 0.0f;
-			FVector Dir = ToTarget.GetSafeNormal();
-			if (!Dir.IsNearlyZero())
-			{
-				AddMovementInput(Dir, 1.0f);
-				// rotate to face
-				FRotator Desired = Dir.Rotation();
-				SetActorRotation(FRotator(0.0f, Desired.Yaw, 0.0f));
-			}
-			// if arrived, disable manual moving
-			if (FVector::DistSquared(GetActorLocation(), TargetLoc) <= FMath::Square(SplinePatrolAcceptanceRadius))
-			{
-				SplineManualMoving = false;
-				UE_LOG(LogTemp, Log, TEXT("SplinePatrol: manual movement arrived at index %d"), SplineCurrentIndex);
-				if (GEngine) GEngine->AddOnScreenDebugMessage((int)GetUniqueID(), 1.5f, FColor::Green, TEXT("SplinePatrol: manual arrived"));
-				// advance will be handled by the arrival branch next tick (or call advance now)
-			}
-		}
-	}
-
-	// Face the player while moving toward them
+	// Acquire controller and blackboard
 	AAIController* AICon = Cast<AAIController>(GetController());
 	if (!AICon) return;
 
 	UBlackboardComponent* BBComp = AICon->GetBlackboardComponent();
 	if (!BBComp) return;
 
+	// Cache path following component for logging and checks
+	auto PF = AICon->GetPathFollowingComponent();
+
+	// If spline patrol is enabled and we DO NOT have a target, perform simple Tick-driven patrol
+	if (bUseSplinePatrol && PatrolSpline)
+	{
+		bool bHasTargetBB = BBComp->GetValueAsBool(TEXT("HasTarget"));
+		int32 NumPoints = PatrolSpline->GetNumPoints();
+		UE_LOG(LogTemp, Verbose, TEXT("SplineTick: Enemy=%s bUseSpline=%d NumPoints=%d CurrIdx=%d HasTarget=%d"), *GetNameSafe(this), (int)bUseSplinePatrol, NumPoints, SplineCurrentIndex, (int)bHasTargetBB);
+
+		if (!bHasTargetBB && NumPoints > 0)
+		{
+			// Ensure current index is valid
+			SplineCurrentIndex = FMath::Clamp(SplineCurrentIndex, 0, NumPoints - 1);
+
+			FVector TargetLoc = GetSplinePointLocation(SplineCurrentIndex);
+			FVector ActorLoc = GetActorLocation();
+			// Use world-space spline point as MoveTarget (no projection)
+			FVector MoveTarget = TargetLoc;
+
+			// Cache path end for debug (do not use for arrival decision)
+			FVector PathEnd = MoveTarget;
+			if (PF && PF->GetPath())
+			{
+				const auto& Points = PF->GetPath()->GetPathPoints();
+				if (Points.Num() > 0)
+				{
+					PathEnd = Points.Last().Location;
+				}
+			}
+
+			// Arrival decision uses straight-line distance to the MoveTarget (world-space spline point)
+			float Dist = FVector::Dist(ActorLoc, MoveTarget); // linear distance in cm
+			float Accept = SplinePatrolAcceptanceRadius; // linear acceptance in cm
+
+			UE_LOG(LogTemp, Log, TEXT("SplineTick: Enemy=%s idx=%d splineTarget=%s actor=%s moveTarget=%s pathEnd=%s distToMoveTarget=%.2fcm accept=%.2fcm"),
+				*GetNameSafe(this), SplineCurrentIndex, *TargetLoc.ToCompactString(), *ActorLoc.ToCompactString(), *MoveTarget.ToCompactString(), *PathEnd.ToCompactString(), Dist, Accept);
+			DrawDebugSphere(World, TargetLoc, 32.0f, 8, FColor::Purple, false, 0.1f);
+			DrawDebugSphere(World, MoveTarget, 20.0f, 6, FColor::Orange, false, 0.1f);
+			DrawDebugSphere(World, PathEnd, 18.0f, 6, FColor::Blue, false, 0.1f);
+
+			if (Dist <= Accept)
+			{
+				// Arrived -> advance and immediately request next MoveTo
+				int32 Old = SplineCurrentIndex;
+				int32 NewIdx = AdvanceSplineIndex();
+				FVector NextLoc = GetSplinePointLocation(SplineCurrentIndex);
+				FVector UseNext = NextLoc; // world-space next point
+				UE_LOG(LogTemp, Log, TEXT("SplineTick: Arrived at MoveTarget. Advancing %d -> %d actor=%s splineTarget=%s nextTarget=%s dist=%.2fcm accept=%.2fcm"),
+					Old, NewIdx, *ActorLoc.ToCompactString(), *TargetLoc.ToCompactString(), *NextLoc.ToCompactString(), Dist, Accept);
+				EPathFollowingRequestResult::Type MoveRes = AICon->MoveToLocation(UseNext, SplinePatrolAcceptanceRadius-50);
+				UE_LOG(LogTemp, Log, TEXT("SplineTick: MoveTo requested nextTarget=%s result=%d"), *UseNext.ToCompactString(), (int)MoveRes);
+				if (PF && PF->GetPath())
+				{
+					const auto& Points = PF->GetPath()->GetPathPoints();
+					if (Points.Num() > 0)
+					{
+						FVector PathEnd2 = Points.Last().Location;
+						UE_LOG(LogTemp, Verbose, TEXT("SplineTick: Path end point = %s (dist to actor=%.2fcm)"), *PathEnd2.ToCompactString(), FVector::Dist(ActorLoc, PathEnd2));
+						DrawDebugSphere(World, PathEnd2, 20.0f, 6, FColor::Blue, false, 1.0f);
+					}
+				}
+				if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Green, FString::Printf(TEXT("Spline: advanced to %d"), NewIdx));
+				return; // patrol action taken this tick
+			}
+			else
+			{
+				// Ensure we have an active move request toward MoveTarget
+				bool bMoving = false;
+				if (PF)
+				{
+					bMoving = (PF->GetStatus() == EPathFollowingStatus::Moving);
+				}
+				if (!bMoving)
+				{
+					UE_LOG(LogTemp, Warning, TEXT("SplineTick: Re-request MoveTo. Actor=%s splineTarget=%s moveTarget=%s pathEnd=%s distToMoveTarget=%.2fcm accept=%.2fcm"), *ActorLoc.ToCompactString(), *TargetLoc.ToCompactString(), *MoveTarget.ToCompactString(), *PathEnd.ToCompactString(), Dist, Accept);
+					EPathFollowingRequestResult::Type MoveRes = AICon->MoveToLocation(MoveTarget, SplinePatrolAcceptanceRadius-100);
+					UE_LOG(LogTemp, Warning, TEXT("SplineTick: MoveTo requested target=%s res=%d"), *MoveTarget.ToCompactString(), (int)MoveRes);
+					if (PF && PF->GetPath())
+					{
+						const auto& Points = PF->GetPath()->GetPathPoints();
+						if (Points.Num() > 0)
+						{
+							FVector PathEnd3 = Points.Last().Location;
+							UE_LOG(LogTemp, Verbose, TEXT("SplineTick: Path end point = %s (dist to actor=%.2fcm)"), *PathEnd3.ToCompactString(), FVector::Dist(ActorLoc, PathEnd3));
+							DrawDebugSphere(World, PathEnd3, 20.0f, 6, FColor::Blue, false, 1.0f);
+						}
+					}
+					if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Yellow, FString::Printf(TEXT("Spline: MoveTo idx=%d res=%d"), SplineCurrentIndex, (int)MoveRes));
+				}
+				return; // patrol ensured this tick
+			}
+		}
+	}
+
+	// If we reach here, either not using spline patrol or BehaviorTree has a target — do facing logic below
 	const FName TargetActorKey = TEXT("TargetActor");
 	const FName HasTargetKey = TEXT("HasTarget");
 	const FName IsBlockedKey = TEXT("IsBlockedByDoor");
@@ -312,7 +304,6 @@ void AEnemy::Tick(float DeltaTime)
 
 	if (bHasTarget && Target && !bBlocked)
 	{
-		// Smoothly rotate to face the player's horizontal direction
 		FVector ToTarget = Target->GetActorLocation() - GetActorLocation();
 		FVector ToTargetXY = FVector(ToTarget.X, ToTarget.Y, 0.0f);
 		if (!ToTargetXY.IsNearlyZero())
@@ -326,7 +317,6 @@ void AEnemy::Tick(float DeltaTime)
 			SetActorRotation(FRotator(0.0f, NewYaw, 0.0f));
 		}
 
-		// Optionally draw a debug line from AI to player
 		DrawDebugLine(World, Eye, Target->GetActorLocation(), FColor::Red, false, 0.0f, 0, 2.0f);
 	}
 }
@@ -509,20 +499,17 @@ void AEnemy::StartSplinePatrol()
 	if (!PatrolSpline) { UE_LOG(LogTemp, Warning, TEXT("StartSplinePatrol called but PatrolSpline is null on %s"), *GetNameSafe(this)); return; }
 	SplineCurrentIndex = PatrolSpline->GetClosestPointIndex(GetActorLocation());
 	int32 Num = PatrolSpline->GetNumPoints();
-	UE_LOG(LogTemp, Log, TEXT("StartSplinePatrol: %s closest index=%d NumPoints=%d"), *GetNameSafe(this), SplineCurrentIndex, Num);
+	FVector ActorLoc = GetActorLocation();
+	FVector Target = GetSplinePointLocation(SplineCurrentIndex);
+	UE_LOG(LogTemp, Log, TEXT("StartSplinePatrol: %s closest index=%d NumPoints=%d actor=%s splineTarget=%s"), *GetNameSafe(this), SplineCurrentIndex, Num, *ActorLoc.ToCompactString(), *Target.ToCompactString());
 	// request move to current spline point
 	AAIController* AICon = Cast<AAIController>(GetController());
 	if (!AICon) { UE_LOG(LogTemp, Warning, TEXT("StartSplinePatrol: No AIController for %s"), *GetNameSafe(this)); return; }
 
-	// bind move completed delegate
-	if (AICon->GetPathFollowingComponent())
-	{
-		AICon->GetPathFollowingComponent()->OnRequestFinished.AddUObject(this, &AEnemy::OnPathFollowingRequestFinished);
-	}
+	FVector UseTarget = Target; // Use world-space target
 
-	FVector Target = GetSplinePointLocation(SplineCurrentIndex);
-	EPathFollowingRequestResult::Type MoveRes = AICon->MoveToLocation(Target, SplinePatrolAcceptanceRadius);
-	UE_LOG(LogTemp, Log, TEXT("StartSplinePatrol: %s starting spline patrol. StartIndex=%d NumPoints=%d MoveRes=%d Target=(%s)"), *GetNameSafe(this), SplineCurrentIndex, Num, (int)MoveRes, *Target.ToCompactString());
+	EPathFollowingRequestResult::Type MoveRes = AICon->MoveToLocation(UseTarget, SplinePatrolAcceptanceRadius-100);
+	UE_LOG(LogTemp, Log, TEXT("StartSplinePatrol: %s starting spline patrol. StartIndex=%d NumPoints=%d MoveRes=%d MoveToTarget=(%s) splineTarget=(%s)"), *GetNameSafe(this), SplineCurrentIndex, Num, (int)MoveRes, *UseTarget.ToCompactString(), *Target.ToCompactString());
 	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.5f, FColor::Cyan, FString::Printf(TEXT("SplinePatrol: start idx %d res=%d"), SplineCurrentIndex, (int)MoveRes));
 }
 
@@ -554,7 +541,7 @@ void AEnemy::OnPathFollowingRequestFinished(FAIRequestID RequestID, const FPathF
 		int32 OldIndex = SplineCurrentIndex;
 		int32 NewIndex = AdvanceSplineIndex();
 		FVector NextLoc = GetSplinePointLocation(SplineCurrentIndex);
-		EPathFollowingRequestResult::Type MoveRes = AICon->MoveToLocation(NextLoc, SplinePatrolAcceptanceRadius);
+		EPathFollowingRequestResult::Type MoveRes = AICon->MoveToLocation(NextLoc, SplinePatrolAcceptanceRadius-100);
 		UE_LOG(LogTemp, Log, TEXT("OnPathFollowingRequestFinished: Advancing spline %d -> %d, MoveRes=%d"), OldIndex, NewIndex, (int)MoveRes);
 		if (GEngine) GEngine->AddOnScreenDebugMessage((int)GetUniqueID(), 2.0f, FColor::Green, FString::Printf(TEXT("SplinePatrol: advanced to %d"), NewIndex));
 	}
