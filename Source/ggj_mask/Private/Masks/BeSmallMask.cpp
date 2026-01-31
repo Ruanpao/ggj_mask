@@ -14,7 +14,7 @@ ABeSmallMask::ABeSmallMask()
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
 	MeshComponent->SetupAttachment(RootComponent);
 
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Script/Engine.StaticMesh'/Game/model/火焰面具/1_对象002.1_对象002'"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Script/Engine.StaticMesh'/Game/model/flame_mask/1.1'"));
 	if (CubeMesh.Succeeded())
 	{
 		MeshComponent->SetStaticMesh(CubeMesh.Object);

@@ -14,7 +14,7 @@ AOpenDoorMask::AOpenDoorMask()
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
 	MeshComponent->SetupAttachment(RootComponent);
 
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Script/Engine.StaticMesh'/Game/model/水面具/1.1'"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Script/Engine.StaticMesh'/Game/model/water_mask/1.1'"));
 	if (CubeMesh.Succeeded())
 	{
 		MeshComponent->SetStaticMesh(CubeMesh.Object);
