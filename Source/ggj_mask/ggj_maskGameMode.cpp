@@ -30,8 +30,7 @@ void Aggj_maskGameMode::BeginPlay()
 			// Ensure input mode is GameOnly so keyboard/mouse control is enabled for gameplay
 			FInputModeGameAndUI InputMode;
 			PC->SetInputMode(InputMode);
-			PC->bShowMouseCursor = true
-			;
+			PC->bShowMouseCursor = true;
 			UE_LOG(LogTemp, Log, TEXT("Aggj_maskGameMode::BeginPlay - input mode set to GameOnly, mouse cursor shown."));
 		}
 	}
