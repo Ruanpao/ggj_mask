@@ -6,6 +6,7 @@
 #include "GameFramework/Pawn.h"
 #include "Components/BoxComponent.h"
 #include "Components/SphereComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/FloatingPawnMovement.h"
 
 // Forward declare AI path-following types to avoid heavy includes in header
@@ -45,6 +46,10 @@ public:
 	// Movement component so Pawn can be moved by AIController::MoveTo
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Movement")
 	UFloatingPawnMovement* MovementComp;
+
+	// Skeletal mesh for the enemy (attach masks to a socket on this mesh)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Visual")
+	USkeletalMeshComponent* SkeletalMeshComp;
 
 
 	// Behavior tree asset slot (assignable in Editor)
@@ -207,4 +212,8 @@ public:
 	// Overlap handler for the interaction box
 	UFUNCTION()
 	void OnInteractionOverlapBegin(class UPrimitiveComponent* OverlappedComp, class AActor* OtherActor, class UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult & SweepResult);
+	void WearMaskToFace(TSubclassOf<AActor> MaskClass);
+	void RemoveWornMask();
+
+	AActor* CurrentWornMask;
 };

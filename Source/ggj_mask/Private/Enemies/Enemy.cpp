@@ -7,6 +7,7 @@
 #include "AIController.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "GameFramework/FloatingPawnMovement.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/BoxComponent.h"
 #include "MonitorDoor.h" // include MonitorDoor so we can detect class in traces
@@ -51,6 +52,14 @@ AEnemy::AEnemy()
 		MovementComp->MaxSpeed = 600.0f;
 	}
 
+	// Create skeletal mesh (visual representation)
+	SkeletalMeshComp = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkeletalMeshComp"));
+	if (SkeletalMeshComp)
+	{
+		SkeletalMeshComp->SetupAttachment(RootComponent);
+		SkeletalMeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
 	// Interaction box for player interaction (will trigger defeat UI when player overlaps)
 	InteractionBox = CreateDefaultSubobject<UBoxComponent>(TEXT("InteractionBox"));
 	if (InteractionBox)
@@ -78,9 +87,51 @@ void AEnemy::BeginPlay()
 		InteractionBox->OnComponentBeginOverlap.AddDynamic(this, &AEnemy::OnInteractionOverlapBegin);
 	}
 
+	// Spawn and attach masks to this enemy based on its flags (will appear in the "MaskSocket").
+	{
+		UWorld* World = GetWorld();
+		if (World)
+		{
+			FActorSpawnParameters SpawnParams;
+			SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			SpawnParams.Owner = this;
+
+			
+
+			// Small mask
+			if (CanDropSmallMask)
+			{
+				if (SmallMaskBP)
+				{
+					WearMaskToFace(ABeSmallMask::StaticClass());
+				}
+			}
+
+			// Open door mask
+			if (CanDropOpenDoorMask)
+			{
+				if (OpenDoorMaskBP)
+				{
+					WearMaskToFace(AOpenDoorMask::StaticClass());
+				}
+
+			}
+
+			// Drag mask
+			if (CanDropDragMask)
+			{
+				if (DragMaskBP)
+				{
+					WearMaskToFace(ADragMask::StaticClass());
+				}
+
+			}
+		}
+	}
+
 	// Defensive: if a perception component was accidentally added to the Pawn (via BP), remove it.
 
-
+	
 	// Initialize BehaviorTree and Blackboard using the Pawn's Controller (AAIController)
 	if (BehaviorTree)
 	{
@@ -767,4 +818,66 @@ void AEnemy::OnInteractionOverlapBegin(UPrimitiveComponent* OverlappedComp, AAct
         return;
     }
 
+}
+void AEnemy::WearMaskToFace(TSubclassOf<AActor> MaskClass)
+{
+	RemoveWornMask();
+
+	if(!MaskClass)
+	{
+		return;
+	}
+
+	USkeletalMeshComponent* CharacterMesh = SkeletalMeshComp;
+	if(!CharacterMesh)
+	{
+		return;
+	}
+
+	FName MaskSocketName = TEXT("MaskSocket");
+
+	if (!CharacterMesh->DoesSocketExist(MaskSocketName))
+	{
+		UE_LOG(LogTemplateCharacter, Error, TEXT("插槽 %s 不存在!"), *MaskSocketName.ToString());
+		return;
+	}
+	
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	SpawnParams.Owner = this;
+
+	// 直接生成在角色位置，然后附加到插槽
+	CurrentWornMask = GetWorld()->SpawnActor<AActor>(MaskClass, GetActorLocation(), GetActorRotation(), SpawnParams);
+
+	if(CurrentWornMask)
+	{
+		// 直接附加到插槽
+		CurrentWornMask->AttachToComponent(CharacterMesh, 
+			FAttachmentTransformRules::SnapToTargetIncludingScale, 
+			MaskSocketName);
+		
+		// 确保面具可见
+		TArray<UStaticMeshComponent*> MeshComps;
+		CurrentWornMask->GetComponents<UStaticMeshComponent>(MeshComps);
+		
+		for(UStaticMeshComponent* MeshComp : MeshComps)
+		{
+			if(MeshComp)
+			{
+				MeshComp->SetVisibility(true);
+				MeshComp->SetHiddenInGame(false);
+			}
+		}
+		
+		UE_LOG(LogTemplateCharacter, Warning, TEXT("成功佩戴面具: %s"), *CurrentWornMask->GetName());
+	}
+}
+
+void AEnemy::RemoveWornMask()
+{
+	if(CurrentWornMask)
+	{
+		CurrentWornMask->Destroy();
+		CurrentWornMask = nullptr;
+	}
 }
