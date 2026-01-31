@@ -95,6 +95,9 @@ protected:
 	void StartDragging(const FInputActionValue& Value);
 	void StopDragging(const FInputActionValue& Value);
 
+	void WearMaskToFace(TSubclassOf<AActor> MaskClass);
+	void RemoveWornMask();
+	
 	ADraggableCube* FinDraggableCube();
 protected:
 	// APawn interface
@@ -132,5 +135,8 @@ private:
 	float GrowCheckRadius = 100.0f;
 	
 	ADraggableCube* CurrentDraggableCube;
+	
+	UPROPERTY()
+	AActor* CurrentWornMask;
 };
 

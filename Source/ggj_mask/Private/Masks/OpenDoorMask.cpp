@@ -13,6 +13,17 @@ AOpenDoorMask::AOpenDoorMask()
 	// 创建静态网格组件
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
 	MeshComponent->SetupAttachment(RootComponent);
+
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Script/Engine.StaticMesh'/Game/model/水面具/1.1'"));
+	if (CubeMesh.Succeeded())
+	{
+		MeshComponent->SetStaticMesh(CubeMesh.Object);
+	}
+	
+	// 确保组件可见
+	MeshComponent->SetVisibility(true);
+	MeshComponent->SetHiddenInGame(false);
+	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
 void AOpenDoorMask::BeginPlay()

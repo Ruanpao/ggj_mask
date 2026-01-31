@@ -49,7 +49,7 @@ Aggj_maskCharacter::Aggj_maskCharacter()
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
 	CameraBoom->bUsePawnControlRotation = false;
-	CameraBoom->SetRelativeRotation(FRotator(-60.f, 0.f, 0.f));
+	CameraBoom->SetRelativeRotation(FRotator(-30.f, 0.f, 0.f));
 	CameraBoom->TargetArmLength = 1000.0f; 
 	//CameraBoom->SetUsingAbsoluteRotation(true); 
 	CameraBoom->bDoCollisionTest = false;
@@ -203,6 +203,8 @@ void Aggj_maskCharacter::WearBasicMask(const FInputActionValue& Value)
 	bWearSmallMask = false;
 	bWearOpenDoorMask = false;
 	bWearDragMask = false;
+
+	WearMaskToFace(ABasicMask::StaticClass());
 }
 
 void Aggj_maskCharacter::WearSmallMask(const FInputActionValue& Value)
@@ -216,6 +218,8 @@ void Aggj_maskCharacter::WearSmallMask(const FInputActionValue& Value)
 	bWearSmallMask = true;
 	bWearOpenDoorMask = false;
 	bWearDragMask = false;
+
+	WearMaskToFace(ABeSmallMask::StaticClass());
 }
 
 void Aggj_maskCharacter::WearOpenDoorMask(const FInputActionValue& Value)
@@ -229,6 +233,8 @@ void Aggj_maskCharacter::WearOpenDoorMask(const FInputActionValue& Value)
 	bWearSmallMask = false;
 	bWearOpenDoorMask = true;
 	bWearDragMask = false;
+
+	WearMaskToFace(AOpenDoorMask::StaticClass());
 }
 
 void Aggj_maskCharacter::WearDragMask(const FInputActionValue& Value)
@@ -242,6 +248,8 @@ void Aggj_maskCharacter::WearDragMask(const FInputActionValue& Value)
 	bWearSmallMask = false;
 	bWearOpenDoorMask = false;
 	bWearDragMask = true;
+
+	WearMaskToFace(ADragMask::StaticClass());
 }
 
 bool Aggj_maskCharacter::CanGrowBack()
@@ -429,6 +437,69 @@ void Aggj_maskCharacter::StopDragging(const FInputActionValue& Value)
 	{
 		CurrentDraggableCube->StopDragging();
 		CurrentDraggableCube = nullptr;
+	}
+}
+
+void Aggj_maskCharacter::WearMaskToFace(TSubclassOf<AActor> MaskClass)
+{
+	RemoveWornMask();
+
+	if(!MaskClass)
+	{
+		return;
+	}
+
+	USkeletalMeshComponent* CharacterMesh = GetMesh();
+	if(!CharacterMesh)
+	{
+		return;
+	}
+
+	FName MaskSocketName = TEXT("MaskSocket");
+
+	if (!CharacterMesh->DoesSocketExist(MaskSocketName))
+	{
+		UE_LOG(LogTemplateCharacter, Error, TEXT("插槽 %s 不存在!"), *MaskSocketName.ToString());
+		return;
+	}
+	
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	SpawnParams.Owner = this;
+
+	// 直接生成在角色位置，然后附加到插槽
+	CurrentWornMask = GetWorld()->SpawnActor<AActor>(MaskClass, GetActorLocation(), GetActorRotation(), SpawnParams);
+
+	if(CurrentWornMask)
+	{
+		// 直接附加到插槽
+		CurrentWornMask->AttachToComponent(CharacterMesh, 
+			FAttachmentTransformRules::SnapToTargetIncludingScale, 
+			MaskSocketName);
+		
+		// 确保面具可见
+		TArray<UStaticMeshComponent*> MeshComps;
+		CurrentWornMask->GetComponents<UStaticMeshComponent>(MeshComps);
+		
+		for(UStaticMeshComponent* MeshComp : MeshComps)
+		{
+			if(MeshComp)
+			{
+				MeshComp->SetVisibility(true);
+				MeshComp->SetHiddenInGame(false);
+			}
+		}
+		
+		UE_LOG(LogTemplateCharacter, Warning, TEXT("成功佩戴面具: %s"), *CurrentWornMask->GetName());
+	}
+}
+
+void Aggj_maskCharacter::RemoveWornMask()
+{
+	if(CurrentWornMask)
+	{
+		CurrentWornMask->Destroy();
+		CurrentWornMask = nullptr;
 	}
 }
 
