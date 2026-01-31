@@ -7,6 +7,7 @@
 #include "ggj_mask/ggj_maskCharacter.h"
 #include "Engine/Engine.h"
 #include "Math/UnrealMathUtility.h" 
+#include "Enemies/Enemy.h" // allow checking enemy properties
 
 AMonitorDoor::AMonitorDoor()
 {
@@ -44,12 +45,23 @@ void AMonitorDoor::Tick(float DeltaTime)
 void AMonitorDoor::OnTriggerBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
 	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
+	// Player opening door via mask
 	if(Aggj_maskCharacter* PlayerCharacter = Cast<Aggj_maskCharacter>(OtherActor))
 	{
 		if(PlayerCharacter->IsWearOpenDoorMask())
 		{
 			OpenDoor();
 			
+		}
+		return; // handled
+	}
+
+	// Enemy opening door if permitted
+	if (AEnemy* EnemyActor = Cast<AEnemy>(OtherActor))
+	{
+		if (EnemyActor->CanOpenDoor)
+		{
+			OpenDoor();
 		}
 	}
 }
