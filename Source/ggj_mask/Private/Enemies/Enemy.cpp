@@ -229,6 +229,47 @@ void AEnemy::Tick(float DeltaTime)
 				}
 			}
 
+			// Determine whether the controller currently has an active path request (moving)
+			bool bMoving = false;
+			if (PF)
+			{
+				bMoving = (PF->GetStatus() == EPathFollowingStatus::Moving);
+			}
+
+			// If we're moving (and not chasing a target), face the movement direction
+			if (bMoving && !bHasTargetBB)
+			{
+				FVector MoveVel = FVector::ZeroVector;
+				if (MovementComp)
+				{
+					MoveVel = MovementComp->Velocity;
+				}
+				// fallback: if MovementComp has no velocity, derive from next path point
+				if (MoveVel.IsNearlyZero() && PF && PF->GetPath() && PF->GetPath()->GetPathPoints().Num() > 0)
+				{
+					const auto& Pts = PF->GetPath()->GetPathPoints();
+					// look for first point that differs from actor location
+					for (int32 i = 0; i < Pts.Num(); ++i)
+					{
+						FVector DirCandidate = (Pts[i].Location - ActorLoc);
+						DirCandidate.Z = 0.0f;
+						if (!DirCandidate.IsNearlyZero()) { MoveVel = DirCandidate.GetSafeNormal() * 1.0f; break; }
+					}
+				}
+				// Apply facing if we have movement direction
+				FVector MoveDir2D = FVector(MoveVel.X, MoveVel.Y, 0.0f);
+				if (!MoveDir2D.IsNearlyZero())
+				{
+					FRotator CurrentRot = GetActorRotation();
+					FRotator DesiredRot = MoveDir2D.Rotation();
+					float YawDiff = FRotator::NormalizeAxis(DesiredRot.Yaw - CurrentRot.Yaw);
+					float MaxDelta = RotationSpeed * DeltaTime; // degrees allowed this frame
+					float Clamped = FMath::Clamp(YawDiff, -MaxDelta, MaxDelta);
+					float NewYaw = CurrentRot.Yaw + Clamped;
+					SetActorRotation(FRotator(0.0f, NewYaw, 0.0f));
+				}
+			}
+
 			// Arrival decision uses straight-line distance to the MoveTarget (world-space spline point)
 			float Dist = FVector::Dist(ActorLoc, MoveTarget); // linear distance in cm
 			float Accept = SplinePatrolAcceptanceRadius; // linear acceptance in cm
@@ -248,7 +289,7 @@ void AEnemy::Tick(float DeltaTime)
 				FVector UseNext = NextLoc; // world-space next point
 				UE_LOG(LogTemp, Log, TEXT("SplineTick: Arrived at MoveTarget. Advancing %d -> %d actor=%s splineTarget=%s nextTarget=%s dist=%.2fcm accept=%.2fcm"),
 					Old, NewIdx, *ActorLoc.ToCompactString(), *TargetLoc.ToCompactString(), *NextLoc.ToCompactString(), Dist, Accept);
-				EPathFollowingRequestResult::Type MoveRes = AICon->MoveToLocation(UseNext, SplinePatrolAcceptanceRadius-50);
+				EPathFollowingRequestResult::Type MoveRes = AICon->MoveToLocation(UseNext, SplinePatrolAcceptanceRadius-100);
 				UE_LOG(LogTemp, Log, TEXT("SplineTick: MoveTo requested nextTarget=%s result=%d"), *UseNext.ToCompactString(), (int)MoveRes);
 				if (PF && PF->GetPath())
 				{
@@ -266,28 +307,28 @@ void AEnemy::Tick(float DeltaTime)
 			else
 			{
 				// Ensure we have an active move request toward MoveTarget
-				bool bMoving = false;
+				bMoving = false;
 				if (PF)
 				{
 					bMoving = (PF->GetStatus() == EPathFollowingStatus::Moving);
 				}
-				if (!bMoving)
-				{
-					UE_LOG(LogTemp, Warning, TEXT("SplineTick: Re-request MoveTo. Actor=%s splineTarget=%s moveTarget=%s pathEnd=%s distToMoveTarget=%.2fcm accept=%.2fcm"), *ActorLoc.ToCompactString(), *TargetLoc.ToCompactString(), *MoveTarget.ToCompactString(), *PathEnd.ToCompactString(), Dist, Accept);
-					EPathFollowingRequestResult::Type MoveRes = AICon->MoveToLocation(MoveTarget, SplinePatrolAcceptanceRadius-100);
-					UE_LOG(LogTemp, Warning, TEXT("SplineTick: MoveTo requested target=%s res=%d"), *MoveTarget.ToCompactString(), (int)MoveRes);
-					if (PF && PF->GetPath())
-					{
-						const auto& Points = PF->GetPath()->GetPathPoints();
-						if (Points.Num() > 0)
-						{
-							FVector PathEnd3 = Points.Last().Location;
-							UE_LOG(LogTemp, Verbose, TEXT("SplineTick: Path end point = %s (dist to actor=%.2fcm)"), *PathEnd3.ToCompactString(), FVector::Dist(ActorLoc, PathEnd3));
-							DrawDebugSphere(World, PathEnd3, 20.0f, 6, FColor::Blue, false, 1.0f);
-						}
-					}
-					if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Yellow, FString::Printf(TEXT("Spline: MoveTo idx=%d res=%d"), SplineCurrentIndex, (int)MoveRes));
-				}
+                if (!bMoving)
+                {
+                    UE_LOG(LogTemp, Warning, TEXT("SplineTick: Re-request MoveTo. Actor=%s splineTarget=%s moveTarget=%s pathEnd=%s distToMoveTarget=%.2fcm accept=%.2fcm"), *ActorLoc.ToCompactString(), *TargetLoc.ToCompactString(), *MoveTarget.ToCompactString(), *PathEnd.ToCompactString(), Dist, Accept);
+                    EPathFollowingRequestResult::Type MoveRes = AICon->MoveToLocation(MoveTarget, SplinePatrolAcceptanceRadius-100);
+                    UE_LOG(LogTemp, Warning, TEXT("SplineTick: MoveTo requested target=%s res=%d"), *MoveTarget.ToCompactString(), (int)MoveRes);
+                    if (PF && PF->GetPath())
+                    {
+                        const auto& Points = PF->GetPath()->GetPathPoints();
+                        if (Points.Num() > 0)
+                        {
+                            FVector PathEnd3 = Points.Last().Location;
+                            UE_LOG(LogTemp, Verbose, TEXT("SplineTick: Path end point = %s (dist to actor=%.2fcm)"), *PathEnd3.ToCompactString(), FVector::Dist(ActorLoc, PathEnd3));
+                            DrawDebugSphere(World, PathEnd3, 20.0f, 6, FColor::Blue, false, 1.0f);
+                        }
+                    }
+                    if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Yellow, FString::Printf(TEXT("Spline: MoveTo idx=%d res=%d"), SplineCurrentIndex, (int)MoveRes));
+                }
 				return; // patrol ensured this tick
 			}
 		}
