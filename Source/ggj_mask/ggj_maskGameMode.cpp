@@ -28,7 +28,7 @@ void Aggj_maskGameMode::BeginPlay()
 		if (PC)
 		{
 			// Ensure input mode is GameOnly so keyboard/mouse control is enabled for gameplay
-			FInputModeGameOnly InputMode;
+			FInputModeGameAndUI InputMode;
 			PC->SetInputMode(InputMode);
 			PC->bShowMouseCursor = true
 			;

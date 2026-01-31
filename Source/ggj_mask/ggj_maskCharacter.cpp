@@ -55,7 +55,7 @@ Aggj_maskCharacter::Aggj_maskCharacter()
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
 	CameraBoom->bUsePawnControlRotation = false;
-	CameraBoom->SetRelativeRotation(FRotator(-30.f, 0.f, 0.f));
+	CameraBoom->SetRelativeRotation(FRotator(-60.f, 0.f, 0.f));
 	CameraBoom->TargetArmLength = 1000.0f; 
 	//CameraBoom->SetUsingAbsoluteRotation(true); 
 	CameraBoom->bDoCollisionTest = false;
@@ -351,7 +351,7 @@ bool Aggj_maskCharacter::CanGrowBack()
 
 void Aggj_maskCharacter::ApplySkill(const FInputActionValue& Value)
 {
-	
+	UE_LOG(LogTemplateCharacter, Error, TEXT("Apply11111"));
 	if (bWearBasicMask)
 	{
 		UE_LOG(LogTemplateCharacter, Error, TEXT("Apply Basic Mask Skill"));
