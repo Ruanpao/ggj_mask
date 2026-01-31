@@ -6,6 +6,10 @@
 #include "AIController.h"
 #include "EnemyController.generated.h"
 
+class UAISenseConfig_Sight;
+struct FAIStimulus;
+class AEnemy; // forward-declare AEnemy so we can store a pointer to it
+
 /**
  * 
  */
@@ -17,4 +21,27 @@ class GGJ_MASK_API AEnemyController : public AAIController
 public:
 	AEnemyController();
 	virtual void OnPossess(APawn* InPawn) override;
+
+protected:
+	// Perception is provided by the base AAIController (do not redeclare PerceptionComponent here)
+	// Controller-owned sight config
+	UPROPERTY()
+	UAISenseConfig_Sight* SightConfig;
+
+	// Forward perception updates to the pawn
+	UFUNCTION()
+	void OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
+	
+	// Start behavior tree once nav is ready
+	void StartBehaviorTreeWhenNavReady();
+	void CheckNavAndStart();
+
+	// cached pawn (AEnemy) we control
+	UPROPERTY(Transient)
+	AEnemy* ControlledEnemy = nullptr;
+
+private:
+	FTimerHandle NavCheckTimer;
+	bool bBehaviorTreeStarted = false;
+	float NavCheckInterval = 1.0f; // seconds between nav ready checks
 };

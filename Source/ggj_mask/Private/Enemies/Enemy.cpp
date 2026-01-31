@@ -2,15 +2,13 @@
 
 
 #include "Enemies/Enemy.h"
-#include "Perception/AIPerceptionComponent.h"
-#include "Perception/AISenseConfig_Sight.h"
-#include "Perception/AISense_Sight.h"
 #include "BehaviorTree/BlackboardComponent.h"
-#include "BehaviorTree/BehaviorTree.h"
+#include "BehaviorTree/BehaviorTreeComponent.h"
 #include "AIController.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "GameFramework/FloatingPawnMovement.h"
 #include "Components/SphereComponent.h"
+#include "Components/BoxComponent.h"
 #include "MonitorDoor.h" // include MonitorDoor so we can detect class in traces
 #include "Engine/World.h"
 #include "ggj_mask/ggj_maskCharacter.h" // player character class
@@ -20,6 +18,7 @@
 #include "Engine/Engine.h"
 #include "NavigationSystem.h"
 #include "NavigationSystemTypes.h"
+#include "BehaviorTree/BehaviorTree.h"
 
 // Sets default values
 AEnemy::AEnemy()
@@ -38,36 +37,25 @@ AEnemy::AEnemy()
 	CollisionComp->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	CollisionComp->SetCollisionObjectType(ECollisionChannel::ECC_Pawn);
 
-	// Create perception component
-	PerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("AIPerceptionComp"));
-
-	SightConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightConfig"));
-
-	// Configure sight defaults
-	if (SightConfig)
-	{
-		SightConfig->SightRadius = 500.0f;
-		SightConfig->LoseSightRadius = 500.0f;
-		SightConfig->PeripheralVisionAngleDegrees = 45.0f;
-		SightConfig->SetMaxAge(5.0f);
-		SightConfig->DetectionByAffiliation.bDetectEnemies = true;
-		SightConfig->DetectionByAffiliation.bDetectNeutrals = true;
-		SightConfig->DetectionByAffiliation.bDetectFriendlies = true;
-	}
-
-	if (PerceptionComponent && SightConfig)
-	{
-		PerceptionComponent->ConfigureSense(*SightConfig);
-		PerceptionComponent->SetDominantSense(UAISense_Sight::StaticClass());
-		PerceptionComponent->OnTargetPerceptionUpdated.AddDynamic(this, &AEnemy::OnTargetPerceptionUpdated);
-	}
-
 	// Create movement component and attach
 	MovementComp = CreateDefaultSubobject<UFloatingPawnMovement>(TEXT("MovementComp"));
 	if (MovementComp)
 	{
 		MovementComp->UpdatedComponent = CollisionComp;
 		MovementComp->MaxSpeed = 600.0f;
+	}
+
+	// Interaction box for player interaction (will trigger defeat UI when player overlaps)
+	InteractionBox = CreateDefaultSubobject<UBoxComponent>(TEXT("InteractionBox"));
+	if (InteractionBox)
+	{
+		InteractionBox->SetupAttachment(RootComponent);
+		InteractionBox->SetBoxExtent(FVector(120.f, 120.f, 120.f));
+		InteractionBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+		InteractionBox->SetCollisionObjectType(ECollisionChannel::ECC_WorldDynamic);
+		InteractionBox->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
+		InteractionBox->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Overlap);
+		InteractionBox->SetGenerateOverlapEvents(true);
 	}
 
 	// Create blackboard/behavior components removed — controller will manage them
@@ -77,7 +65,16 @@ AEnemy::AEnemy()
 void AEnemy::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
+	// Bind interaction overlap
+	if (InteractionBox)
+	{
+		InteractionBox->OnComponentBeginOverlap.AddDynamic(this, &AEnemy::OnInteractionOverlapBegin);
+	}
+
+	// Defensive: if a perception component was accidentally added to the Pawn (via BP), remove it.
+
+
 	// Initialize BehaviorTree and Blackboard using the Pawn's Controller (AAIController)
 	if (BehaviorTree)
 	{
@@ -85,16 +82,22 @@ void AEnemy::BeginPlay()
 		if (!AICon)
 		{
 			// If controller not yet possessed, try to spawn logic later or log
-			return;
+			// We'll rely on PossessedBy to start the tree when controller arrives
 		}
-
-		if (BehaviorTree->BlackboardAsset)
+		else
 		{
-			UBlackboardComponent* BBComp = AICon->GetBlackboardComponent();
-			AICon->UseBlackboard(BehaviorTree->BlackboardAsset, BBComp);
-		}
+			if (!bBehaviorTreeStarted)
+			{
+				if (BehaviorTree->BlackboardAsset)
+				{
+					UBlackboardComponent* BBComp = AICon->GetBlackboardComponent();
+					AICon->UseBlackboard(BehaviorTree->BlackboardAsset, BBComp);
+				}
 
-		AICon->RunBehaviorTree(BehaviorTree);
+				AICon->RunBehaviorTree(BehaviorTree);
+				bBehaviorTreeStarted = true;
+			}
+		}
 	}
 
 	// Initialize patrol: set current index to nearest patrol point if any
@@ -175,14 +178,9 @@ void AEnemy::Tick(float DeltaTime)
 	if (!World) return;
 
 	FVector Eye = GetActorLocation() + FVector(0.0f, 0.0f, 50.0f);
-	float SightRadius = 2000.0f;
+	float SightRadius = 2000.0f; // keep local defaults for debug drawing
 	float PeripheralAngle = 45.0f;
-	if (SightConfig)
-	{
-		SightRadius = SightConfig->SightRadius;
-		PeripheralAngle = SightConfig->PeripheralVisionAngleDegrees;
-	}
-
+	
 	FVector Forward = GetActorForwardVector();
 	DrawDebugLine(World, Eye, Eye + Forward * SightRadius, FColor::Green, false, 0.0f, 0, 1.0f);
 	FVector LeftDir = Forward.RotateAngleAxis(-PeripheralAngle, FVector::UpVector).GetSafeNormal();
@@ -201,12 +199,12 @@ void AEnemy::Tick(float DeltaTime)
 	// Cache path following component for logging and checks
 	auto PF = AICon->GetPathFollowingComponent();
 
-	// If spline patrol is enabled and we DO NOT have a target, perform simple Tick-driven patrol
+	// If spline patrol is enabled, and we DO NOT have a target, perform simple Tick-driven patrol
 	if (bUseSplinePatrol && PatrolSpline)
 	{
 		bool bHasTargetBB = BBComp->GetValueAsBool(TEXT("HasTarget"));
 		int32 NumPoints = PatrolSpline->GetNumPoints();
-		UE_LOG(LogTemp, Verbose, TEXT("SplineTick: Enemy=%s bUseSpline=%d NumPoints=%d CurrIdx=%d HasTarget=%d"), *GetNameSafe(this), (int)bUseSplinePatrol, NumPoints, SplineCurrentIndex, (int)bHasTargetBB);
+		//UE_LOG(LogTemp, Verbose, TEXT("SplineTick: Enemy=%s bUseSpline=%d NumPoints=%d CurrIdx=%d HasTarget=%d"), *GetNameSafe(this), (int)bUseSplinePatrol, NumPoints, SplineCurrentIndex, (int)bHasTargetBB);
 
 		if (!bHasTargetBB && NumPoints > 0)
 		{
@@ -274,8 +272,8 @@ void AEnemy::Tick(float DeltaTime)
 			float Dist = FVector::Dist(ActorLoc, MoveTarget); // linear distance in cm
 			float Accept = SplinePatrolAcceptanceRadius; // linear acceptance in cm
 
-			UE_LOG(LogTemp, Log, TEXT("SplineTick: Enemy=%s idx=%d splineTarget=%s actor=%s moveTarget=%s pathEnd=%s distToMoveTarget=%.2fcm accept=%.2fcm"),
-				*GetNameSafe(this), SplineCurrentIndex, *TargetLoc.ToCompactString(), *ActorLoc.ToCompactString(), *MoveTarget.ToCompactString(), *PathEnd.ToCompactString(), Dist, Accept);
+			// UE_LOG(LogTemp, Log, TEXT("SplineTick: Enemy=%s idx=%d splineTarget=%s actor=%s moveTarget=%s pathEnd=%s distToMoveTarget=%.2fcm accept=%.2fcm"),
+			// 	*GetNameSafe(this), SplineCurrentIndex, *TargetLoc.ToCompactString(), *ActorLoc.ToCompactString(), *MoveTarget.ToCompactString(), *PathEnd.ToCompactString(), Dist, Accept);
 			DrawDebugSphere(World, TargetLoc, 32.0f, 8, FColor::Purple, false, 0.1f);
 			DrawDebugSphere(World, MoveTarget, 20.0f, 6, FColor::Orange, false, 0.1f);
 			DrawDebugSphere(World, PathEnd, 18.0f, 6, FColor::Blue, false, 0.1f);
@@ -287,17 +285,17 @@ void AEnemy::Tick(float DeltaTime)
 				int32 NewIdx = AdvanceSplineIndex();
 				FVector NextLoc = GetSplinePointLocation(SplineCurrentIndex);
 				FVector UseNext = NextLoc; // world-space next point
-				UE_LOG(LogTemp, Log, TEXT("SplineTick: Arrived at MoveTarget. Advancing %d -> %d actor=%s splineTarget=%s nextTarget=%s dist=%.2fcm accept=%.2fcm"),
-					Old, NewIdx, *ActorLoc.ToCompactString(), *TargetLoc.ToCompactString(), *NextLoc.ToCompactString(), Dist, Accept);
+				//UE_LOG(LogTemp, Log, TEXT("SplineTick: Arrived at MoveTarget. Advancing %d -> %d actor=%s splineTarget=%s nextTarget=%s dist=%.2fcm accept=%.2fcm"),
+				//	Old, NewIdx, *ActorLoc.ToCompactString(), *TargetLoc.ToCompactString(), *NextLoc.ToCompactString(), Dist, Accept);
 				EPathFollowingRequestResult::Type MoveRes = AICon->MoveToLocation(UseNext, 10);
-				UE_LOG(LogTemp, Log, TEXT("SplineTick: MoveTo requested nextTarget=%s result=%d"), *UseNext.ToCompactString(), (int)MoveRes);
+				//UE_LOG(LogTemp, Log, TEXT("SplineTick: MoveTo requested nextTarget=%s result=%d"), *UseNext.ToCompactString(), (int)MoveRes);
 				if (PF && PF->GetPath())
 				{
 					const auto& Points = PF->GetPath()->GetPathPoints();
 					if (Points.Num() > 0)
 					{
 						FVector PathEnd2 = Points.Last().Location;
-						UE_LOG(LogTemp, Verbose, TEXT("SplineTick: Path end point = %s (dist to actor=%.2fcm)"), *PathEnd2.ToCompactString(), FVector::Dist(ActorLoc, PathEnd2));
+						//UE_LOG(LogTemp, Verbose, TEXT("SplineTick: Path end point = %s (dist to actor=%.2fcm)"), *PathEnd2.ToCompactString(), FVector::Dist(ActorLoc, PathEnd2));
 						DrawDebugSphere(World, PathEnd2, 20.0f, 6, FColor::Blue, false, 1.0f);
 					}
 				}
@@ -314,16 +312,16 @@ void AEnemy::Tick(float DeltaTime)
 				}
                 if (!bMoving)
                 {
-                    UE_LOG(LogTemp, Warning, TEXT("SplineTick: Re-request MoveTo. Actor=%s splineTarget=%s moveTarget=%s pathEnd=%s distToMoveTarget=%.2fcm accept=%.2fcm"), *ActorLoc.ToCompactString(), *TargetLoc.ToCompactString(), *MoveTarget.ToCompactString(), *PathEnd.ToCompactString(), Dist, Accept);
+                    //UE_LOG(LogTemp, Warning, TEXT("SplineTick: Re-request MoveTo. Actor=%s splineTarget=%s moveTarget=%s pathEnd=%s distToMoveTarget=%.2fcm accept=%.2fcm"), *ActorLoc.ToCompactString(), *TargetLoc.ToCompactString(), *MoveTarget.ToCompactString(), *PathEnd.ToCompactString(), Dist, Accept);
                     EPathFollowingRequestResult::Type MoveRes = AICon->MoveToLocation(MoveTarget, 10);
-                    UE_LOG(LogTemp, Warning, TEXT("SplineTick: MoveTo requested target=%s res=%d"), *MoveTarget.ToCompactString(), (int)MoveRes);
+                    //UE_LOG(LogTemp, Warning, TEXT("SplineTick: MoveTo requested target=%s res=%d"), *MoveTarget.ToCompactString(), (int)MoveRes);
                     if (PF && PF->GetPath())
                     {
                         const auto& Points = PF->GetPath()->GetPathPoints();
                         if (Points.Num() > 0)
                         {
                             FVector PathEnd3 = Points.Last().Location;
-                            UE_LOG(LogTemp, Verbose, TEXT("SplineTick: Path end point = %s (dist to actor=%.2fcm)"), *PathEnd3.ToCompactString(), FVector::Dist(ActorLoc, PathEnd3));
+                            //UE_LOG(LogTemp, Verbose, TEXT("SplineTick: Path end point = %s (dist to actor=%.2fcm)"), *PathEnd3.ToCompactString(), FVector::Dist(ActorLoc, PathEnd3));
                             DrawDebugSphere(World, PathEnd3, 20.0f, 6, FColor::Blue, false, 1.0f);
                         }
                     }
@@ -368,51 +366,51 @@ void AEnemy::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
 }
-
-void AEnemy::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
-{
-	// Filter out MonitorDoor actors from being treated as sensed targets
-	if (Actor && Actor->IsA(AMonitorDoor::StaticClass()))
-	{
-		// Ignore MonitorDoor perception updates entirely
-		return;
-	}
-
-	// Only treat player character as a valid TargetActor
-	if (!Actor || !Actor->IsA(Aggj_maskCharacter::StaticClass()))
-	{
-		// Not the player -> ignore for target selection
-		return;
-	}
-
-	AAIController* AICon = Cast<AAIController>(GetController());
-	if (!AICon) return;
-
-	UBlackboardComponent* BBComp = AICon->GetBlackboardComponent();
-	if (!BBComp) return;
-
-	// Keys used in blackboard. Assumption: Blackboard has these keys defined.
-	const FName HasTargetKey = TEXT("HasTarget");
-	const FName TargetActorKey = TEXT("TargetActor"); // change this name if your blackboard uses a different key
-
-	if (Stimulus.WasSuccessfullySensed())
-	{
-		// Set boolean and actor reference when sensed
-		BBComp->SetValueAsBool(HasTargetKey, true);
-		BBComp->SetValueAsObject(TargetActorKey, Actor);
-	}
-	else
-	{
-		// Only clear the actor key if the blackboard currently references this actor
-		UObject* CurrentTarget = BBComp->GetValueAsObject(TargetActorKey);
-		if (CurrentTarget == Actor)
-		{
-			BBComp->ClearValue(TargetActorKey);
-			BBComp->SetValueAsBool(HasTargetKey, false);
-		}
-		// If CurrentTarget != Actor, another target is already set; don't overwrite it here.
-	}
-}
+//
+// void AEnemy::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
+// {
+// 	// Filter out MonitorDoor actors from being treated as sensed targets
+// 	if (Actor && Actor->IsA(AMonitorDoor::StaticClass()))
+// 	{
+// 		// Ignore MonitorDoor perception updates entirely
+// 		return;
+// 	}
+//
+// 	// Only treat player character as a valid TargetActor
+// 	if (!Actor || !Actor->IsA(Aggj_maskCharacter::StaticClass()))
+// 	{
+// 		// Not the player -> ignore for target selection
+// 		return;
+// 	}
+//
+// 	AAIController* AICon = Cast<AAIController>(GetController());
+// 	if (!AICon) return;
+//
+// 	UBlackboardComponent* BBComp = AICon->GetBlackboardComponent();
+// 	if (!BBComp) return;
+//
+// 	// Keys used in blackboard. Assumption: Blackboard has these keys defined.
+// 	const FName HasTargetKey = TEXT("HasTarget");
+// 	const FName TargetActorKey = TEXT("TargetActor"); // change this name if your blackboard uses a different key
+//
+// 	if (Stimulus.WasSuccessfullySensed())
+// 	{
+// 		// Set boolean and actor reference when sensed
+// 		BBComp->SetValueAsBool(HasTargetKey, true);
+// 		BBComp->SetValueAsObject(TargetActorKey, Actor);
+// 	}
+// 	else
+// 	{
+// 		// Only clear the actor key if the blackboard currently references this actor
+// 		UObject* CurrentTarget = BBComp->GetValueAsObject(TargetActorKey);
+// 		if (CurrentTarget == Actor)
+// 		{
+// 			BBComp->ClearValue(TargetActorKey);
+// 			BBComp->SetValueAsBool(HasTargetKey, false);
+// 		}
+// 		// If CurrentTarget != Actor, another target is already set; don't overwrite it here.
+// 	}
+// }
 
 // Patrol helpers
 AActor* AEnemy::GetNearestPatrolPoint() const
@@ -605,4 +603,50 @@ FVector AEnemy::GetSplinePointLocation(int32 Index) const
 {
 	if (!PatrolSpline) return FVector::ZeroVector;
 	return PatrolSpline->GetPointLocation(Index);
+}
+
+// Called when possessed by controller
+void AEnemy::PossessedBy(AController* NewController)
+{
+    Super::PossessedBy(NewController);
+
+    if (bBehaviorTreeStarted) return;
+
+    AAIController* AICon = Cast<AAIController>(NewController);
+    if (!AICon) return;
+
+    if (BehaviorTree)
+    {
+        if (BehaviorTree->BlackboardAsset)
+        {
+            UBlackboardComponent* BBComp = AICon->GetBlackboardComponent();
+            AICon->UseBlackboard(BehaviorTree->BlackboardAsset, BBComp);
+        }
+
+        AICon->RunBehaviorTree(BehaviorTree);
+        bBehaviorTreeStarted = true;
+        UE_LOG(LogTemp, Log, TEXT("AEnemy::PossessedBy - BehaviorTree started for %s"), *GetNameSafe(this));
+    }
+}
+
+void AEnemy::OnInteractionOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+                                      UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult & SweepResult)
+{
+    if (!OtherActor) return;
+
+    // Check if the overlapping actor is the player character
+    Aggj_maskCharacter* PlayerCharacter = Cast<Aggj_maskCharacter>(OtherActor);
+    if (PlayerCharacter)
+    {
+        // Prevent multiple triggers
+        if (PlayerCharacter->bIsDefeated) return;
+
+        // Mark player defeated and show defeat UI
+        PlayerCharacter->bIsDefeated = true;
+        PlayerCharacter->ShowDefeatUI();
+
+        UE_LOG(LogTemp, Log, TEXT("AEnemy::OnInteractionOverlapBegin - Player %s defeated by Enemy %s"), *GetNameSafe(PlayerCharacter), *GetNameSafe(this));
+        // Optionally disable enemy movement or other effects here
+        // e.g., StopSplinePatrol();
+    }
 }

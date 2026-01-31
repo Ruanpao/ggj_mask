@@ -4,13 +4,14 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
+#include "Components/BoxComponent.h"
 
 // Forward declare AI path-following types to avoid heavy includes in header
 struct FAIRequestID;
 struct FPathFollowingResult;
 
 // Forward declarations to avoid requiring include paths in the header
-class UAIPerceptionComponent;
+//class UAIPerceptionComponent;
 class UAISenseConfig_Sight;
 class UBehaviorTree;
 class USphereComponent;
@@ -28,9 +29,11 @@ public:
 	// Sets default values for this pawn's properties
 	AEnemy();
 	
-
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+
+	// Called when this pawn is possessed by a controller (start behavior tree when AIController arrives)
+	virtual void PossessedBy(AController* NewController) override;
 
 	// Collision component - provides a root collision volume so navigation and physics work
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Collision")
@@ -40,21 +43,14 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Movement")
 	UFloatingPawnMovement* MovementComp;
 
-	// Perception component (sight)
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI")
-	UAIPerceptionComponent* PerceptionComponent;
-
-	// Sight sense configuration
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI")
-	UAISenseConfig_Sight* SightConfig;
 
 	// Behavior tree asset slot (assignable in Editor)
 	UPROPERTY(EditAnywhere, Category = "AI")
 	UBehaviorTree* BehaviorTree;
 
-	// Perception callback to update blackboard key "HasTarget"
-	UFUNCTION()
-	void OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
+	// // Perception callback to update blackboard key "HasTarget"
+	// UFUNCTION()
+	// void OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
 
 	UPROPERTY(EditAnywhere, Category = "Mask")
 	bool CanBeSmall;
@@ -178,4 +174,14 @@ public:
 	// Fallback: when MoveTo repeatedly fails, use manual movement along spline
 	bool SplineManualMoving = false;
 
+	// Whether the behavior tree has been started (prevents double-start)
+	bool bBehaviorTreeStarted = false;
+
+	// Interaction box: when the player overlaps this box the enemy will interact (e.g., defeat the player)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction")
+	UBoxComponent* InteractionBox;
+
+	// Overlap handler for the interaction box
+	UFUNCTION()
+	void OnInteractionOverlapBegin(class UPrimitiveComponent* OverlappedComp, class AActor* OtherActor, class UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult & SweepResult);
 };

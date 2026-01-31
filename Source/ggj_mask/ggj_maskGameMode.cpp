@@ -29,6 +29,8 @@ void Aggj_maskGameMode::BeginPlay()
 		{
 			// Ensure input mode is GameOnly so keyboard/mouse control is enabled for gameplay
 			FInputModeGameAndUI InputMode;
+			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock); // 关键：不锁定鼠标
+			InputMode.SetHideCursorDuringCapture(false); // 关键：捕获时不隐藏光标
 			PC->SetInputMode(InputMode);
 			PC->bShowMouseCursor = true
 			;

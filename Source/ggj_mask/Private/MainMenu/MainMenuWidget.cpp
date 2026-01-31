@@ -110,6 +110,19 @@ void UMainMenuWidget::OnStartGameClicked()
     
     StartAnimation(); 
 
+    // Ensure menu is removed and game is unpaused before loading level
+    if (APlayerController* PC = GetOwningPlayer())
+    {
+        // Unpause the game if paused
+        if (PC->IsPaused())
+        {
+            PC->SetPause(false);
+        }
+    }
+
+    // Remove this widget so NativeDestruct runs (which also unpauses as a safety)
+    RemoveFromParent();
+
     // Load the ThirdPersonMap level
     UE_LOG(LogTemp, Warning, TEXT("MainMenu: Loading level 'ThirdPersonMap'"));
     UGameplayStatics::OpenLevel(this, FName(TEXT("ThirdPersonMap")));
