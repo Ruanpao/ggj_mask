@@ -57,7 +57,7 @@ void AEndDoor::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* Other
 
  	// Check if it's the player character
  	Aggj_maskCharacter* Player = Cast<Aggj_maskCharacter>(OtherActor);
- 	if (Player)
+ 	if (Player && Player->GetbWearOpenDoorMask())
  	{
  		// Open the level named EndMap
  		UGameplayStatics::OpenLevel(this, FName(TEXT("EndMap")));

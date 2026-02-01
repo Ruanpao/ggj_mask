@@ -361,7 +361,7 @@ void Aggj_maskCharacter::ApplySkill(const FInputActionValue& Value)
 		
 		if(!bSmall)
 		{
-			SetActorScale3D(FVector(0.1f, 0.1f, 0.1f));
+			SetActorScale3D(FVector(0.3f, 0.3f, 0.3f));
 			bSmall = true;
 		}
 		else

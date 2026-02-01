@@ -106,6 +106,7 @@ public:
 	// Show the defeat UI and switch input to UI-only
 	void ShowDefeatUI();
 
+	bool GetbWearOpenDoorMask() const { return bWearOpenDoorMask; }
 protected:
 
 	/** Called for movement input */
