@@ -3,6 +3,8 @@
 
 #include "DraggableCube.h"
 #include "Components/StaticMeshComponent.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 ADraggableCube::ADraggableCube()
 {
@@ -127,9 +129,15 @@ void ADraggableCube::UpdateDragging(const FVector& TargetPosition)
 		// 先计算投影位置
 		FVector ProjectedLocation = ProjectToTrack(NewLocation);
 
+		if(!MoveSafely(ProjectedLocation))
+		{
+			PushPlayerAway();
+			return;
+		}
+		
 		// 添加位置平滑过渡
 		FVector CurrentLocation = GetActorLocation();
-		float MaxMoveDistance = 500.0f;
+		float MaxMoveDistance = 30.0f;
 
 		if(FVector::Dist(CurrentLocation, ProjectedLocation) > MaxMoveDistance)
 		{
@@ -140,6 +148,12 @@ void ADraggableCube::UpdateDragging(const FVector& TargetPosition)
 		else
 		{
 			NewLocation = ProjectedLocation;
+
+			if (!MoveSafely(NewLocation))
+			{
+				PushPlayerAway();
+				return;
+			}
 		}
 	}
 	SetActorLocation(NewLocation);
@@ -251,4 +265,107 @@ int32 ADraggableCube::FindNearestSegmentIndex(const FVector& Position)
 		}
 	}
 	return NearestSegmentIndex;
+}
+
+void ADraggableCube::PushPlayerAway()
+{
+	// 冷却检查
+	float CurrentTime = GetWorld()->GetTimeSeconds();
+	if (CurrentTime - LastPushTime < PushCooldown)
+	{
+		return;
+	}
+    
+	LastPushTime = CurrentTime;
+    
+	if (!DraggingActor) return;
+    
+	// 获取玩家角色
+	ACharacter* PlayerCharacter = Cast<ACharacter>(DraggingActor);
+	if (!PlayerCharacter) return;
+    
+	// 计算推动方向（从方块指向玩家）
+	FVector CubeLocation = GetActorLocation();
+	FVector PlayerLocation = PlayerCharacter->GetActorLocation();
+	FVector PushDirection = (PlayerLocation - CubeLocation).GetSafeNormal();
+    
+	// 向上稍微推一点，避免玩家被压在地面上
+	PushDirection.Z += 0.001f;
+	PushDirection.Normalize();
+    
+	// 应用推动力
+	FVector PushForceVector = PushDirection * PushForce;
+    
+	// 使用AddImpulse或AddForce推动玩家
+	UCharacterMovementComponent* MovementComp = PlayerCharacter->GetCharacterMovement();
+	if (MovementComp)
+	{
+		// 先清除当前速度
+		MovementComp->Velocity = FVector::ZeroVector;
+        
+		// 应用推动力
+		MovementComp->AddImpulse(PushForceVector, true);
+        
+		// 限制最大速度
+		MovementComp->MaxWalkSpeed = 3000.0f;
+        
+		// 0.5秒后恢复原速度
+		FTimerHandle TimerHandle;
+		GetWorld()->GetTimerManager().SetTimer(TimerHandle, [MovementComp]()
+		{
+			if (MovementComp)
+			{
+				MovementComp->MaxWalkSpeed = 700.0f; // 恢复默认速度
+			}
+		}, 0.5f, false);
+	}
+	
+    
+	UE_LOG(LogTemp, Warning, TEXT("推动玩家，方向: %s"), *PushDirection.ToString());
+}
+
+bool ADraggableCube::CheckPlayerCollision(const FVector& NewLocation)
+{
+	if(!DraggingActor)
+	{
+		return false;
+	}
+
+	FVector PlayerLocation = DraggingActor->GetActorLocation();
+
+	FVector CubeLocation = GetActorLocation();
+	FVector MoveDirection = (NewLocation - CubeLocation).GetSafeNormal();
+
+	// 计算方块前进的方向上是否会碰到玩家
+	FVector ToPlayer = (PlayerLocation - CubeLocation).GetSafeNormal();
+	float DotProduct = FVector::DotProduct(MoveDirection, ToPlayer);
+    
+	// 如果玩家在方块移动方向上
+	if (DotProduct > 0.7f) // 0.7表示大约45度角内
+	{
+		// 计算距离
+		float DistanceToPlayer = FVector::Dist(CubeLocation, PlayerLocation);
+        
+		// 如果距离足够近，认为会碰撞
+		if (DistanceToPlayer < PlayerCheckRadius)
+		{
+			// 绘制调试信息
+			DrawDebugSphere(GetWorld(), PlayerLocation, 50.0f, 12, FColor::Red, false, 0.1f);
+			DrawDebugLine(GetWorld(), CubeLocation, PlayerLocation, FColor::Red, false, 0.1f, 0, 2.0f);
+            
+			return true;
+		}
+	}
+    
+	return false;
+}
+
+bool ADraggableCube::MoveSafely(const FVector& TargetLocation)
+{
+	// 首先检查是否会碰到玩家
+	if (CheckPlayerCollision(TargetLocation))
+	{
+		return false;
+	}
+	return true;
 }

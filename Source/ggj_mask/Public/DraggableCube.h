@@ -68,4 +68,22 @@ private:
 	
 	//当前轨道线段索引
 	int32 CurrentTrackSegmentIndex = -1;
+
+	//推力
+	UPROPERTY(EditAnywhere,Category = "Dragging")
+	float PushForce = 1500.f;
+
+	//碰撞检测半径
+	UPROPERTY(EditAnywhere, Category = "Dragging")
+	float PlayerCheckRadius = 150.0f;
+	
+	float PushCooldown = 0.5f;
+	float LastPushTime = 0.0f;
+
+	//推动玩家
+	void PushPlayerAway();
+
+	bool CheckPlayerCollision(const FVector& NewLocation);
+
+	bool MoveSafely(const FVector& TargetLocation);
 };
