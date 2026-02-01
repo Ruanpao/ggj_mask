@@ -40,7 +40,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
 	class USoundBase* ButtonClickSound;
 
-private:
+
 	UFUNCTION()
 	void OnStartGameClicked();
 

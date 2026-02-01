@@ -67,6 +67,10 @@ class Aggj_maskCharacter : public ACharacter
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* DragAction;
+
+	// Esc menu input action (bind Esc key in Input Settings / Mapping Context and assign this action in editor)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* EscMenuAction;
 public:
 	Aggj_maskCharacter();
 
@@ -80,6 +84,14 @@ public:
 	// Runtime instance (transient)
 	UPROPERTY(Transient)
 	UUserWidget* DefeatWidgetInstance;
+
+	// Esc menu widget class (assign the Blueprint widget in editor)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+	TSubclassOf<UUserWidget> EscMenuWidgetClass;
+
+	// Esc menu runtime instance (transient)
+	UPROPERTY(Transient)
+	UUserWidget* EscMenuWidgetInstance;
 
 	// Whether the character has been defeated (so overlap only triggers once)
 	bool bIsDefeated = false;
@@ -114,6 +126,9 @@ protected:
 
 	void StartDragging(const FInputActionValue& Value);
 	void StopDragging(const FInputActionValue& Value);
+
+	// Toggle or open the Esc menu widget
+	void ToggleEscMenu(const FInputActionValue& Value);
 
 	void WearMaskToFace(TSubclassOf<AActor> MaskClass);
 	void RemoveWornMask();
@@ -154,9 +169,9 @@ private:
 	bool bCanGrowBack = true;
 	float GrowCheckRadius = 100.0f;
 	
+	UPROPERTY()
 	ADraggableCube* CurrentDraggableCube;
 	
 	UPROPERTY()
 	AActor* CurrentWornMask;
 };
-

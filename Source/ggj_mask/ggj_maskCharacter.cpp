@@ -170,6 +170,9 @@ void Aggj_maskCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 
 		EnhancedInputComponent->BindAction(DragAction, ETriggerEvent::Started, this, &Aggj_maskCharacter::StartDragging);
 		EnhancedInputComponent->BindAction(DragAction, ETriggerEvent::Completed, this, &Aggj_maskCharacter::StopDragging);
+
+		// Bind Esc menu action to toggle the Esc menu widget
+		EnhancedInputComponent->BindAction(EscMenuAction, ETriggerEvent::Started, this, &Aggj_maskCharacter::ToggleEscMenu);
 		// Looking
 		// EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &Aggj_maskCharacter::Look);
 	}
@@ -584,3 +587,38 @@ ADraggableCube* Aggj_maskCharacter::FinDraggableCube()
 	}
 	return ClosestCube;
 }
+
+void Aggj_maskCharacter::ToggleEscMenu(const FInputActionValue& Value)
+{
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if(!PC) return;
+
+	// If the widget is already present, remove it (simple toggle)
+	if (EscMenuWidgetInstance)
+	{
+		EscMenuWidgetInstance->RemoveFromParent();
+		EscMenuWidgetInstance = nullptr;
+	}
+
+	// If class is not set, nothing to do
+	if (!EscMenuWidgetClass)
+	{
+		UE_LOG(LogTemplateCharacter, Warning, TEXT("EscMenuWidgetClass not set on %s"), *GetNameSafe(this));
+		return;
+	}
+
+	// Create and show the widget
+	EscMenuWidgetInstance = CreateWidget<UUserWidget>(PC, EscMenuWidgetClass);
+	if (EscMenuWidgetInstance)
+	{
+		EscMenuWidgetInstance->AddToViewport();
+
+		// Switch input to UI only
+		FInputModeUIOnly InputMode;
+		InputMode.SetWidgetToFocus(EscMenuWidgetInstance->TakeWidget());
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		PC->SetInputMode(InputMode);
+		PC->bShowMouseCursor = true;
+	}
+}
+
