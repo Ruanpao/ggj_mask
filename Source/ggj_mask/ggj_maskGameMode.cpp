@@ -7,6 +7,7 @@
 #include "Engine/World.h"
 #include "GameFramework/PlayerInput.h"
 #include "InputCoreTypes.h"
+#include "Kismet/GameplayStatics.h"
 
 Aggj_maskGameMode::Aggj_maskGameMode()
 {
@@ -35,5 +36,9 @@ void Aggj_maskGameMode::BeginPlay()
 			PC->bShowMouseCursor = true;
 			UE_LOG(LogTemp, Log, TEXT("Aggj_maskGameMode::BeginPlay - input mode set to GameOnly, mouse cursor shown."));
 		}
+	}
+	if (BackgroundMusic)
+	{
+		UGameplayStatics::PlaySound2D(GetWorld(), BackgroundMusic);
 	}
 }

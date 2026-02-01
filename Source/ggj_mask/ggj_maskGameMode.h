@@ -15,4 +15,7 @@ public:
 	Aggj_maskGameMode();
 
 	virtual void BeginPlay() override;
+	
+	UPROPERTY(EditAnywhere, Category = "Audio")
+	USoundBase* BackgroundMusic;
 };

@@ -504,6 +504,11 @@ void Aggj_maskCharacter::WearMaskToFace(TSubclassOf<AActor> MaskClass)
 		return;
 	}
 
+	if(Masksound)
+	{
+		UGameplayStatics::PlaySound2D(GetWorld(), Masksound);
+	}
+
 	USkeletalMeshComponent* CharacterMesh = GetMesh();
 	if(!CharacterMesh)
 	{

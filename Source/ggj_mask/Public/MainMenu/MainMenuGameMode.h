@@ -20,4 +20,7 @@ protected:
     
     UPROPERTY()
     class UMainMenuWidget* MainMenuWidget;
+
+    UPROPERTY(EditAnywhere, Category = "Audio")
+    USoundBase* BackgroundMusic;
 };
