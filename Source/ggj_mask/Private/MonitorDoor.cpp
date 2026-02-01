@@ -101,33 +101,45 @@ void AMonitorDoor::UpdateDoorMovement(float DeltaTime)
 	FVector CurrentLocation = DoorMesh->GetRelativeLocation();
 	float CurrentHeight = CurrentLocation.Z;
 
-	float MoveDirection;
-	if (TargetHeight > CurrentHeight)
-	{
-		MoveDirection = 1.0f;
-	}
-	else if (TargetHeight < CurrentHeight)
-	{
-		MoveDirection = -1.0f;
-	}
-	else
-	{
-		MoveDirection = 0.0f; 
-		return;
-	}
+	// 计算移动方向和距离
+	float MoveDirection = (TargetHeight > CurrentHeight) ? 1.0f : -1.0f;
 	float MoveAmount = DoorSpeed * DeltaTime * MoveDirection;
 	float NewHeight = CurrentHeight + MoveAmount;
 
-	if(MoveDirection> 0 && NewHeight >= TargetHeight)
+	// 检查是否到达目标高度
+	bool bReachedTarget = false;
+	
+	if (MoveDirection > 0 && NewHeight >= TargetHeight) // 向上移动到达目标
 	{
 		NewHeight = TargetHeight;
-		bIsOpening = false;
+		bReachedTarget = true;
 	}
-	else if(MoveDirection < 0 && NewHeight <= TargetHeight)
+	else if (MoveDirection < 0 && NewHeight <= TargetHeight) // 向下移动到达目标
 	{
 		NewHeight = TargetHeight;
-		bIsClosing = false;
+		bReachedTarget = true;
 	}
+	
 	DoorMesh->SetRelativeLocation(FVector(CurrentLocation.X, CurrentLocation.Y, NewHeight));
+	
+	// 如果到达目标高度
+	if (bReachedTarget)
+	{
+		if (bIsOpening) // 刚完成开门
+		{
+			bIsOpening = false;
+			// 确保计时器已经设置，如果没有则设置
+			if (!GetWorld()->GetTimerManager().IsTimerActive(DoorTimerHandle))
+			{
+				GetWorld()->GetTimerManager().SetTimer(DoorTimerHandle, this, &AMonitorDoor::CloseDoor, OpenDuration, false);
+			}
+		}
+		else if (bIsClosing) // 刚完成关门
+		{
+			bIsClosing = false;
+			// 清除计时器
+			GetWorld()->GetTimerManager().ClearTimer(DoorTimerHandle);
+		}
+	}
 }
 
