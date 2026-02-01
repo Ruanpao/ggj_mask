@@ -71,7 +71,7 @@ private:
 
 	//推力
 	UPROPERTY(EditAnywhere,Category = "Dragging")
-	float PushForce = 1500.f;
+	float PushForce = 1000.f;
 
 	//碰撞检测半径
 	UPROPERTY(EditAnywhere, Category = "Dragging")
