@@ -44,4 +44,11 @@ private:
 	FTimerHandle NavCheckTimer;
 	bool bBehaviorTreeStarted = false;
 	float NavCheckInterval = 1.0f; // seconds between nav ready checks
+
+	// When player is lost from sight, wait this many seconds before clearing blackboard target
+	FTimerHandle LostSightTimer;
+	float LostSightDelay = 5.0f;
+
+	// Clear TargetActor and LastSeenLocation on blackboard after losing sight for LostSightDelay seconds
+	void ClearTargetAndLastSeen();
 };

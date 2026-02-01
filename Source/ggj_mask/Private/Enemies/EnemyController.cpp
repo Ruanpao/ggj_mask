@@ -152,6 +152,9 @@ void AEnemyController::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 	if (Stimulus.WasSuccessfullySensed())
 	{
 		UE_LOG(LogTemp, Log, TEXT("OnPerceptionUpdated: Sensed player %s for enemy %s"), *GetNameSafe(Actor), *GetNameSafe(EnemyPawn));
+		// Cancel any pending lost-sight clearing
+		GetWorldTimerManager().ClearTimer(LostSightTimer);
+
 		// Write target info
 		BB->SetValueAsBool(HasTargetKey, true);
 		BB->SetValueAsObject(TargetActorKey, Actor);
@@ -190,10 +193,12 @@ void AEnemyController::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 	else
 	{
 		UE_LOG(LogTemp, Log, TEXT("OnPerceptionUpdated: Lost sight of player for enemy %s"), *GetNameSafe(EnemyPawn));
-		// Lost sight of player. If we previously had a target, trace to LastSeenLocation to see if blocked by door
-		bool bHadTarget = BB->GetValueAsBool(HasTargetKey);
-		if (!bHadTarget) { UE_LOG(LogTemp, Verbose, TEXT("OnPerceptionUpdated: Previously had no target")); return; }
+		// Lost sight of player. Start/reset a timer to clear the target after a delay instead of clearing immediately
+		GetWorldTimerManager().ClearTimer(LostSightTimer);
+		GetWorldTimerManager().SetTimer(LostSightTimer, this, &AEnemyController::ClearTargetAndLastSeen, LostSightDelay, false);
+		UE_LOG(LogTemp, Log, TEXT("OnPerceptionUpdated: Scheduled ClearTargetAndLastSeen in %.2f seconds for %s"), LostSightDelay, *GetNameSafe(EnemyPawn));
 
+		// Additionally, detect if the last seen location is blocked by a door now by tracing to previous last seen
 		FVector LastSeen = BB->GetValueAsVector(LastSeenKey);
 		FHitResult Hit;
 		FCollisionQueryParams Params;
@@ -210,21 +215,30 @@ void AEnemyController::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 			}
 			else
 			{
-				// No door blocking - clear target and related keys
-				BB->SetValueAsBool(HasTargetKey, false);
-				BB->ClearValue(TargetActorKey);
-				BB->SetValueAsBool(IsBlockedKey, false);
-				BB->ClearValue(DoorImpactKey);
-				UE_LOG(LogTemp, Log, TEXT("OnPerceptionUpdated: Lost sight - cleared target for %s"), *GetNameSafe(EnemyPawn));
+				// Do not clear target yet. Keep existing target until timer fires.
+				UE_LOG(LogTemp, Log, TEXT("OnPerceptionUpdated: Lost sight - keeping target until timer expires for %s"), *GetNameSafe(EnemyPawn));
 			}
 		}
 		else
 		{
-			BB->SetValueAsBool(HasTargetKey, false);
-			BB->ClearValue(TargetActorKey);
-			BB->SetValueAsBool(IsBlockedKey, false);
-			BB->ClearValue(DoorImpactKey);
-			UE_LOG(LogTemp, Log, TEXT("OnPerceptionUpdated: Lost sight - no hit, cleared target for %s"), *GetNameSafe(EnemyPawn));
+			UE_LOG(LogTemp, Log, TEXT("OnPerceptionUpdated: Lost sight - no hit, keeping target for %s"), *GetNameSafe(EnemyPawn));
 		}
 	}
+}
+
+// New: clear target and last seen after delay
+void AEnemyController::ClearTargetAndLastSeen()
+{
+	UBlackboardComponent* BB = GetBlackboardComponent();
+	if (!BB) return;
+
+	const FName HasTargetKey = TEXT("HasTarget");
+	const FName TargetActorKey = TEXT("TargetActor");
+	const FName LastSeenKey = TEXT("LastSeenLocation");
+
+	BB->SetValueAsBool(HasTargetKey, false);
+	BB->ClearValue(TargetActorKey);
+	BB->ClearValue(LastSeenKey);
+
+	UE_LOG(LogTemp, Log, TEXT("ClearTargetAndLastSeen: Cleared target and last seen location for controller %s"), *GetNameSafe(this));
 }
