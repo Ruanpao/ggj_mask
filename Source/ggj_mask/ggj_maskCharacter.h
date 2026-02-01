@@ -68,6 +68,9 @@ class Aggj_maskCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* DragAction;
 
+	UPROPERTY(EditAnywhere, Category = "Audio")
+	USoundBase* Masksound;
+
 	// Esc menu input action (bind Esc key in Input Settings / Mapping Context and assign this action in editor)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* EscMenuAction;

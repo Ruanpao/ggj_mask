@@ -84,6 +84,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mask")
 	TSubclassOf<ADragMask> DragMaskBP;
 
+	UPROPERTY(EditAnywhere, Category = "Audio")
+	USoundBase* KillorGetKilled;
+
 	// UPROPERTY(EditAnywhere, Category = "Mask")
 	// bool CanDisableTraps;
 	//

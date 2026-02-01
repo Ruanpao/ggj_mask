@@ -49,4 +49,8 @@ void AMainMenuGameMode::BeginPlay()
     {
         UE_LOG(LogTemp, Error, TEXT("MainMenuWidgetClass is not set"));
     }
+    if (BackgroundMusic)
+    {
+        UGameplayStatics::PlaySound2D(GetWorld(), BackgroundMusic);
+    }
 }

@@ -25,6 +25,7 @@
 #include "Masks/OpenDoorMask.h"
 #include "Masks/DragMask.h"
 #include "DraggableCube.h"
+#include "Kismet/GameplayStatics.h"
 #include "UObject/UnrealType.h" // for FProperty/FBoolProperty
 
 // Sets default values
@@ -700,6 +701,10 @@ void AEnemy::OnInteractionOverlapBegin(UPrimitiveComponent* OverlappedComp, AAct
 
         // Mark player defeated and show defeat UI
         PlayerCharacter->bIsDefeated = true;
+    	if(KillorGetKilled)
+    	{
+    		UGameplayStatics::PlaySound2D(GetWorld(), KillorGetKilled);
+    	}
         PlayerCharacter->ShowDefeatUI();
 
         UE_LOG(LogTemp, Log, TEXT("AEnemy::OnInteractionOverlapBegin - Player %s defeated by Enemy %s"), *GetNameSafe(PlayerCharacter), *GetNameSafe(this));
@@ -712,7 +717,10 @@ void AEnemy::OnInteractionOverlapBegin(UPrimitiveComponent* OverlappedComp, AAct
     if (DC)
     {
         UE_LOG(LogTemp, Log, TEXT("AEnemy::OnInteractionOverlapBegin - overlapped DraggableCube %s, spawning masks for %s"), *GetNameSafe(DC), *GetNameSafe(this));
-
+    	if(KillorGetKilled)
+    	{
+    		UGameplayStatics::PlaySound2D(GetWorld(), KillorGetKilled);
+    	}
         FActorSpawnParameters SpawnParams;
         SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
         SpawnParams.Owner = this;
