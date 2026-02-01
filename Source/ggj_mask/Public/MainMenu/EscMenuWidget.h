@@ -1,20 +1,18 @@
-﻿#pragma once
+// Fill out your copyright notice in the Description page of Project Settings.
+
+#pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
-#include "Components/Button.h"
-#include "Components/TextBlock.h"
-#include "Components/Image.h"
-#include "Kismet/GameplayStatics.h"
-#include "MainMenuWidget.generated.h"
+#include "MainMenu/MainMenuWidget.h"
+#include "EscMenuWidget.generated.h"
 
+/**
+ * 
+ */
 UCLASS()
-class GGJ_MASK_API UMainMenuWidget : public UUserWidget
+class GGJ_MASK_API UEscMenuWidget : public UUserWidget
 {
-	GENERATED_BODY()
-
-public:
-	virtual void NativeConstruct() override;
+	GENERATED_BODY()	virtual void NativeConstruct() override;
 
 	UFUNCTION(BlueprintCallable, Category = "Main Menu")
 	void StartGame();
@@ -65,7 +63,7 @@ protected:
     
 	void StartAnimation();
 	void UpdateAnimation(float DeltaTime);
-	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 	virtual void NativeDestruct() override;
-	// === 新增代码结束 ===
 };
+
+
