@@ -30,53 +30,7 @@ void ADraggableCube::BeginPlay()
 void ADraggableCube::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
-	// 调试绘制轨道
-	if (bUseTrack && TrackPoints.Num() >= 2)
-	{
-		for (int32 i = 0; i < TrackPoints.Num() - 1; i++)
-		{
-			DrawDebugLine(
-				GetWorld(),
-				TrackPoints[i],
-				TrackPoints[i + 1],
-				FColor::Green,
-				false,
-				-1.0f,
-				0,
-				2.0f
-			);
-
-			// 绘制轨道点
-			DrawDebugSphere(
-				GetWorld(),
-				TrackPoints[i],
-				10.0f,
-				8,
-				FColor::Red,
-				false,
-				-1.0f,
-				0,
-				2.0f
-			);
-		}
-
-		// 绘制最后一个点
-		if (TrackPoints.Num() > 0)
-		{
-			DrawDebugSphere(
-				GetWorld(),
-				TrackPoints.Last(),
-				10.0f,
-				8,
-				FColor::Red,
-				false,
-				-1.0f,
-				0,
-				2.0f
-			);
-		}
-	}
+	
 }
 
 void ADraggableCube::StartDragging(AActor* Dragger)
@@ -118,6 +72,11 @@ void ADraggableCube::UpdateDragging(const FVector& TargetPosition)
 		return;
 	}
 
+	if (!bUseTrack || TrackPoints.Num() < 2)
+	{
+		return;
+	}
+	
 	FVector NewLocation = FVector(
 		TargetPosition.X,
 		TargetPosition.Y,
@@ -290,7 +249,7 @@ void ADraggableCube::PushPlayerAway()
 	FVector PushDirection = (PlayerLocation - CubeLocation).GetSafeNormal();
     
 	// 向上稍微推一点，避免玩家被压在地面上
-	PushDirection.Z += 0.001f;
+	PushDirection.Z += 0.00001f;
 	PushDirection.Normalize();
     
 	// 应用推动力
